@@ -7,6 +7,8 @@ image via homography and slices it into tiles across a range of zoom levels.
 
 ## Usage
 
+The input can be created with [Georeferencer-WebUI](https://github.com/Nils-witt/Georeferencer-WebUI)
+
 ```sh
 go run ./src --config-dir config --min-zoom 14 --max-zoom 18
 ```
