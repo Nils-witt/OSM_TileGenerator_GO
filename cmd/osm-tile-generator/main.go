@@ -11,6 +11,7 @@ import (
 	"OSM_TileGenerator_GO/internal/generator"
 	"OSM_TileGenerator_GO/internal/imaging"
 	"OSM_TileGenerator_GO/internal/tilestore"
+	"OSM_TileGenerator_GO/internal/version"
 )
 
 func createDirectories(configDir string) error {
@@ -27,6 +28,8 @@ func createDirectories(configDir string) error {
 }
 
 func run() error {
+	fmt.Println(version.String())
+
 	configDir := flag.String("config-dir", "config", "Directory containing configuration files")
 	maxZoom := flag.Int("max-zoom", 18, "Maximum zoom level")
 	minZoom := flag.Int("min-zoom", 14, "Minimum zoom level")
