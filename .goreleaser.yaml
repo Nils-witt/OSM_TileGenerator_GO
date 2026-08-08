@@ -17,6 +17,9 @@ builds:
       - arm64
     ldflags:
       - -s -w
+      - -X OSM_TileGenerator_GO/internal/version.Version={{.Version}}
+      - -X OSM_TileGenerator_GO/internal/version.Commit={{.ShortCommit}}
+      - -X OSM_TileGenerator_GO/internal/version.Date={{.Date}}
 
 archives:
   - formats: [tar.gz]
