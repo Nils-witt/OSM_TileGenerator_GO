@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"encoding/json"
@@ -44,8 +44,8 @@ type Project struct {
 	Coordinates []CoordinatePair `json:"coordinates"`
 }
 
-// loadConfig reads and parses config.json from configDir.
-func loadConfig(configDir string) (*Project, error) {
+// LoadConfig reads and parses config.json from configDir.
+func LoadConfig(configDir string) (*Project, error) {
 	data, err := os.ReadFile(configDir + "/config.json")
 	if err != nil {
 		return nil, err

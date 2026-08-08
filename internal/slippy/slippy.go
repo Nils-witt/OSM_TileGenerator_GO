@@ -1,10 +1,12 @@
-package main
+// Package slippy converts between geographic coordinates and OSM slippy-map
+// tile numbers.
+package slippy
 
 import "math"
 
-// deg2num converts latitude/longitude to fractional OSM tile numbers at a given zoom level.
+// Deg2Num converts latitude/longitude to fractional OSM tile numbers at a given zoom level.
 // Credits: https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Go
-func deg2num(latDeg, lonDeg float64, zoom int) (float64, float64) {
+func Deg2Num(latDeg, lonDeg float64, zoom int) (float64, float64) {
 	latRad := latDeg * math.Pi / 180.0
 	n := math.Exp2(float64(zoom))
 	xTile := (lonDeg + 180.0) / 360.0 * n
@@ -12,9 +14,9 @@ func deg2num(latDeg, lonDeg float64, zoom int) (float64, float64) {
 	return xTile, yTile
 }
 
-// num2deg converts OSM tile numbers to latitude/longitude at a given zoom level.
+// Num2Deg converts OSM tile numbers to latitude/longitude at a given zoom level.
 // Credits: https://wiki.openstreetmap.org/wiki/Slippy_map_tilenames#Go
-func num2deg(xTile, yTile float64, zoom int) (float64, float64) {
+func Num2Deg(xTile, yTile float64, zoom int) (float64, float64) {
 	n := math.Exp2(float64(zoom))
 	lonDeg := xTile/n*360.0 - 180.0
 	latRad := math.Atan(math.Sinh(math.Pi * (1 - 2*yTile/n)))

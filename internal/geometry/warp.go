@@ -1,17 +1,17 @@
-package main
+package geometry
 
 import (
 	"image"
 	"math"
 )
 
-// warpPerspective rasterizes src into a canvas of size targetW x targetH using the
+// WarpPerspective rasterizes src into a canvas of size targetW x targetH using the
 // forward homography h (mapping src pixel coords -> dest pixel coords). For each
 // destination pixel it applies h^-1 to find the source sample point and bilinearly
 // interpolates (matching OpenCV's default INTER_LINEAR). Destination pixels whose
 // source sample would require reading outside the source image bounds are left
 // fully transparent, matching cv2.warpPerspective's BORDER_TRANSPARENT.
-func warpPerspective(src *image.NRGBA, h [3][3]float64, targetW, targetH int) *image.NRGBA {
+func WarpPerspective(src *image.NRGBA, h [3][3]float64, targetW, targetH int) *image.NRGBA {
 	hInv := invert3x3(h)
 	dst := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
 

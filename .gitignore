@@ -172,3 +172,10 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+.claude
+.agents
+agent
+skills-lock.json
+
+bin/
+.idea/
