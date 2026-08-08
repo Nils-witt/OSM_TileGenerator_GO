@@ -1,10 +1,10 @@
-package main
+package imaging
 
 import "image"
 
-// tileEmpty reports whether every byte (R,G,B,A of every pixel) in img is zero.
+// Empty reports whether every byte (R,G,B,A of every pixel) in img is zero.
 // Mirrors utils.py::tile_empty (`not np.asarray(tile).any()`).
-func tileEmpty(img *image.NRGBA) bool {
+func Empty(img *image.NRGBA) bool {
 	b := img.Bounds()
 	for y := b.Min.Y; y < b.Max.Y; y++ {
 		off := img.PixOffset(b.Min.X, y)
@@ -49,25 +49,25 @@ func colAllZero(img *image.NRGBA, x, width int) bool {
 	return true
 }
 
-// findYBounds finds the lower y-bound of non-transparent pixels in the image.
+// FindYBounds finds the lower y-bound of non-transparent pixels in the image.
 // Mirrors utils.py::find_y_bounds, including numpy's negative-index wraparound
 // semantics for the (rare) case y goes negative before content is found.
-func findYBounds(img *image.NRGBA) int {
+func FindYBounds(img *image.NRGBA) int {
 	height := img.Bounds().Dy()
 	y := height - 1
 	for y > 0 && rowAllZero(img, y, height) {
-		y -= 256
+		y -= TileSize
 	}
-	return y + 256*2
+	return y + TileSize*2
 }
 
-// findXBounds finds the right x-bound of non-transparent pixels in the image.
+// FindXBounds finds the right x-bound of non-transparent pixels in the image.
 // Mirrors utils.py::find_x_bounds.
-func findXBounds(img *image.NRGBA) int {
+func FindXBounds(img *image.NRGBA) int {
 	width := img.Bounds().Dx()
 	x := width - 1
 	for x > 0 && colAllZero(img, x, width) {
-		x -= 256
+		x -= TileSize
 	}
-	return x + 256*2
+	return x + TileSize*2
 }

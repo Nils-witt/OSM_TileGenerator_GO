@@ -4,7 +4,7 @@ project_name: osm-tile-generator
 
 builds:
   - id: osm-tile-generator
-    main: ./src
+    main: ./cmd/osm-tile-generator
     binary: osm-tile-generator
     env:
       - CGO_ENABLED=0

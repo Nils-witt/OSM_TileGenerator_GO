@@ -1,13 +1,18 @@
-package main
+// Package geometry provides the 4-point homography solver and perspective
+// warping used to project the source overlay image onto the OSM tile grid.
+package geometry
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+)
 
-// solveHomography computes the 3x3 projective homography matrix H mapping each
+// SolveHomography computes the 3x3 projective homography matrix H mapping each
 // src[i] point to the corresponding dst[i] point, for exactly 4 point
 // correspondences. This is the direct linear transform (DLT) with h33 fixed to 1,
 // equivalent to cv2.findHomography's exact solution for 4 non-degenerate points
 // (no RANSAC/outlier rejection needed since the system is exactly determined).
-func solveHomography(src, dst [4][2]float64) [3][3]float64 {
+func SolveHomography(src, dst [4][2]float64) [3][3]float64 {
 	var a [8][8]float64
 	var b [8]float64
 
@@ -41,9 +46,9 @@ func gaussianSolve8(a [8][8]float64, b [8]float64) [8]float64 {
 
 	for col := 0; col < n; col++ {
 		pivot := col
-		maxVal := abs(a[col][col])
+		maxVal := math.Abs(a[col][col])
 		for row := col + 1; row < n; row++ {
-			if v := abs(a[row][col]); v > maxVal {
+			if v := math.Abs(a[row][col]); v > maxVal {
 				pivot = row
 				maxVal = v
 			}
@@ -77,13 +82,6 @@ func gaussianSolve8(a [8][8]float64, b [8]float64) [8]float64 {
 		x[row] = sum / a[row][row]
 	}
 	return x
-}
-
-func abs(v float64) float64 {
-	if v < 0 {
-		return -v
-	}
-	return v
 }
 
 // invert3x3 computes the inverse of a 3x3 matrix via the adjugate/determinant formula.
