@@ -32,7 +32,7 @@ func run() error {
 	minZoom := flag.Int("min-zoom", 14, "Minimum zoom level")
 	flag.Parse()
 
-	fmt.Printf("Hello from Go Worker! Using config directory: %s\n", *configDir)
+	fmt.Printf("Using config directory: %s\n", *configDir)
 
 	cfg, err := config.LoadConfig(*configDir)
 	if err != nil {
