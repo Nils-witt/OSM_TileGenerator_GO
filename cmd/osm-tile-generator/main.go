@@ -90,6 +90,12 @@ func run() error {
 		}
 	}
 
+	zipPath := *configDir + "/tiles.zip"
+	fmt.Printf("Creating zip archive: %s\n", zipPath)
+	if err := tilestore.Zip(*configDir+"/tiles", zipPath); err != nil {
+		return fmt.Errorf("zipping tiles: %w", err)
+	}
+
 	return nil
 }
 
