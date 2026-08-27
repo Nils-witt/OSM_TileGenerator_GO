@@ -50,7 +50,3 @@ pairs are required.
 Tiles are written to `<config-dir>/tiles/{z}/{x}/{y}.png`, generated at
 `-max-zoom` and downsampled for each lower zoom level down to `-min-zoom`.
 A `<config-dir>/tmp` directory is used for intermediate files.
-
-## Requirements
-
-- Go 1.26+
