@@ -5,6 +5,7 @@ import (
 	"fmt"
 	_ "image/png"
 	"log"
+	"net/http"
 	"os"
 
 	"OSM_TileGenerator_GO/internal/config"
@@ -27,13 +28,46 @@ func createDirectories(configDir string) error {
 	return nil
 }
 
+func tileResponseHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Access-Control-Allow-Origin", "*")
+		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		if r.Method == http.MethodOptions {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func tilesHandler(configDir string) http.Handler {
+	return tileResponseHeaders(http.FileServer(http.Dir(configDir + "/tiles")))
+}
+
+func serveTiles(configDir string, port int) error {
+	tilesDir := configDir + "/tiles"
+	if info, err := os.Stat(tilesDir); err != nil || !info.IsDir() {
+		return fmt.Errorf("tiles directory %q not found (generate tiles first): %w", tilesDir, err)
+	}
+
+	addr := fmt.Sprintf(":%d", port)
+	fmt.Printf("Serving %s on http://localhost%s\n", tilesDir, addr)
+	return http.ListenAndServe(addr, tilesHandler(configDir))
+}
+
 func run() error {
 	fmt.Println(version.String())
 
 	configDir := flag.String("config-dir", "config", "Directory containing configuration files")
 	maxZoom := flag.Int("max-zoom", 18, "Maximum zoom level")
 	minZoom := flag.Int("min-zoom", 14, "Minimum zoom level")
+	servePort := flag.Int("serve", 0, "Port to serve <config-dir>/tiles over HTTP instead of generating tiles (e.g. --serve 8080)")
 	flag.Parse()
+
+	if *servePort != 0 {
+		return serveTiles(*configDir, *servePort)
+	}
 
 	fmt.Printf("Using config directory: %s\n", *configDir)
 
