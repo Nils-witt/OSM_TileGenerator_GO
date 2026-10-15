@@ -10,16 +10,26 @@ import (
 
 // Zip archives every file under tilePath (the {z}/{x}/{y}.png tile pyramid)
 // into a single zip file at destPath, preserving the relative directory
-// structure.
-func Zip(tilePath, destPath string) error {
+// structure. Close errors are reported because the zip central directory is
+// only written when the writer is closed; ignoring them would leave a
+// truncated archive behind.
+func Zip(tilePath, destPath string) (err error) {
 	zipFile, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("Zip: creating %s: %w", destPath, err)
 	}
-	defer zipFile.Close()
+	defer func() {
+		if cerr := zipFile.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("Zip: closing %s: %w", destPath, cerr)
+		}
+	}()
 
 	zw := zip.NewWriter(zipFile)
-	defer zw.Close()
+	defer func() {
+		if cerr := zw.Close(); cerr != nil && err == nil {
+			err = fmt.Errorf("Zip: finalizing %s: %w", destPath, cerr)
+		}
+	}()
 
 	return filepath.Walk(tilePath, func(path string, info os.FileInfo, err error) error {
 		if err != nil {

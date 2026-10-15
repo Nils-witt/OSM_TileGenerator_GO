@@ -12,7 +12,7 @@ func TestTilePath(t *testing.T) {
 	t.Parallel()
 
 	got := TilePath("/tiles", 14, 8192, 5461)
-	want := "/tiles/14/8192/5461.png"
+	want := filepath.FromSlash("/tiles/14/8192/5461.png")
 	if got != want {
 		t.Errorf("TilePath() = %q, want %q", got, want)
 	}
@@ -22,7 +22,7 @@ func TestTileDirPath(t *testing.T) {
 	t.Parallel()
 
 	got := TileDirPath("/tiles", 14, 8192)
-	want := "/tiles/14/8192"
+	want := filepath.FromSlash("/tiles/14/8192")
 	if got != want {
 		t.Errorf("TileDirPath() = %q, want %q", got, want)
 	}

@@ -7,9 +7,9 @@ import (
 	"sort"
 	"testing"
 
-	"OSM_TileGenerator_GO/internal/imaging"
-	"OSM_TileGenerator_GO/internal/slippy"
-	"OSM_TileGenerator_GO/internal/tilestore"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/imaging"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/slippy"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/tilestore"
 )
 
 func testMarkers() [4]Marker {
@@ -111,10 +111,10 @@ func TestGenerateTiles_overlayPaths(t *testing.T) {
 
 	g := &GenerateTiles{TmpDir: "/tmp/proj", Zoom: 15}
 
-	if got, want := g.overlayPath(), "/tmp/proj/overlay_15.png"; got != want {
+	if got, want := g.overlayPath(), filepath.FromSlash("/tmp/proj/overlay_15.png"); got != want {
 		t.Errorf("overlayPath() = %q, want %q", got, want)
 	}
-	if got, want := g.overlayCropPath(), "/tmp/proj/overlay_15_crop.png"; got != want {
+	if got, want := g.overlayCropPath(), filepath.FromSlash("/tmp/proj/overlay_15_crop.png"); got != want {
 		t.Errorf("overlayCropPath() = %q, want %q", got, want)
 	}
 }

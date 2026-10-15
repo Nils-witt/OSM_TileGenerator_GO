@@ -1,4 +1,4 @@
-module OSM_TileGenerator_GO
+module github.com/Nils-witt/OSM_TileGenerator_GO
 
 go 1.26.5
 

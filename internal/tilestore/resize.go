@@ -4,9 +4,11 @@ import (
 	"fmt"
 	"image"
 	"os"
+	"path/filepath"
+	"strconv"
 
-	"OSM_TileGenerator_GO/internal/imaging"
-	"OSM_TileGenerator_GO/internal/slippy"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/imaging"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/slippy"
 )
 
 // Resize builds zoom level targetZoom entirely from the tiles present at
@@ -14,13 +16,13 @@ import (
 // zoom order since each level depends on its immediate parent already
 // existing on disk.
 func Resize(tilePath string, targetZoom int) error {
-	sourceDir := fmt.Sprintf("%s/%d", tilePath, targetZoom+1)
+	sourceDir := filepath.Join(tilePath, strconv.Itoa(targetZoom+1))
 	tiles, err := Walk(sourceDir)
 	if err != nil {
 		return err
 	}
 
-	targetDir := fmt.Sprintf("%s/%d", tilePath, targetZoom)
+	targetDir := filepath.Join(tilePath, strconv.Itoa(targetZoom))
 	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return err
 	}

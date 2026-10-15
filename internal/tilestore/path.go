@@ -4,8 +4,8 @@
 package tilestore
 
 import (
-	"fmt"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 )
@@ -17,12 +17,12 @@ type Coord struct {
 
 // TilePath returns the on-disk path of the tile at (z, x, y) under base.
 func TilePath(base string, z, x, y int) string {
-	return fmt.Sprintf("%s/%d/%d/%d.png", base, z, x, y)
+	return filepath.Join(base, strconv.Itoa(z), strconv.Itoa(x), strconv.Itoa(y)+".png")
 }
 
 // TileDirPath returns the on-disk path of the x-directory for zoom z under base.
 func TileDirPath(base string, z, x int) string {
-	return fmt.Sprintf("%s/%d/%d", base, z, x)
+	return filepath.Join(base, strconv.Itoa(z), strconv.Itoa(x))
 }
 
 // Walk lists every tile coordinate present under a single zoom-level
@@ -42,7 +42,7 @@ func Walk(dir string) ([]Coord, error) {
 		if err != nil {
 			continue
 		}
-		yEntries, err := os.ReadDir(fmt.Sprintf("%s/%s", dir, xDir.Name()))
+		yEntries, err := os.ReadDir(filepath.Join(dir, xDir.Name()))
 		if err != nil {
 			return nil, err
 		}

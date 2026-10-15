@@ -3,6 +3,7 @@ package config
 import (
 	"encoding/json"
 	"os"
+	"path/filepath"
 )
 
 // ImgCoordinate is a pixel coordinate within the source image.
@@ -46,7 +47,7 @@ type Project struct {
 
 // LoadConfig reads and parses config.json from configDir.
 func LoadConfig(configDir string) (*Project, error) {
-	data, err := os.ReadFile(configDir + "/config.json")
+	data, err := os.ReadFile(filepath.Join(configDir, "config.json"))
 	if err != nil {
 		return nil, err
 	}

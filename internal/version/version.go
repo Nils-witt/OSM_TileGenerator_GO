@@ -2,9 +2,9 @@
 //
 // Version, Commit, and Date are overridden at build time via
 //
-//	-ldflags "-X OSM_TileGenerator_GO/internal/version.Version=... \
-//	          -X OSM_TileGenerator_GO/internal/version.Commit=... \
-//	          -X OSM_TileGenerator_GO/internal/version.Date=..."
+//	-ldflags "-X github.com/Nils-witt/OSM_TileGenerator_GO/internal/version.Version=... \
+//	          -X github.com/Nils-witt/OSM_TileGenerator_GO/internal/version.Commit=... \
+//	          -X github.com/Nils-witt/OSM_TileGenerator_GO/internal/version.Date=..."
 //
 // which is what GoReleaser does for release builds. For local `go build`/`go run`
 // and CI builds that don't pass ldflags, Commit and Date fall back to the VCS

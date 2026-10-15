@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"testing"
 
-	"OSM_TileGenerator_GO/internal/imaging"
-	"OSM_TileGenerator_GO/internal/slippy"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/imaging"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/slippy"
 )
 
 func solidTile(r, g, b, a uint8) *image.NRGBA {

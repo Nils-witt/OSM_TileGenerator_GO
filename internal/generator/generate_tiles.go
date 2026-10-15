@@ -7,12 +7,13 @@ import (
 	"image"
 	"log"
 	"os"
+	"path/filepath"
 	"sort"
 
-	"OSM_TileGenerator_GO/internal/geometry"
-	"OSM_TileGenerator_GO/internal/imaging"
-	"OSM_TileGenerator_GO/internal/slippy"
-	"OSM_TileGenerator_GO/internal/tilestore"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/geometry"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/imaging"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/slippy"
+	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/tilestore"
 )
 
 // osmTileOffset is the margin, in whole tiles, padded around the marker bounding
@@ -118,11 +119,11 @@ func (g *GenerateTiles) calculateTargetSize() (int, int) {
 }
 
 func (g *GenerateTiles) overlayPath() string {
-	return fmt.Sprintf("%s/overlay_%d.png", g.TmpDir, g.Zoom)
+	return filepath.Join(g.TmpDir, fmt.Sprintf("overlay_%d.png", g.Zoom))
 }
 
 func (g *GenerateTiles) overlayCropPath() string {
-	return fmt.Sprintf("%s/overlay_%d_crop.png", g.TmpDir, g.Zoom)
+	return filepath.Join(g.TmpDir, fmt.Sprintf("overlay_%d_crop.png", g.Zoom))
 }
 
 // warpImage computes the homography from picturePoints -> mapImgOffsets and
