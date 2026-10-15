@@ -181,3 +181,5 @@ bin/
 .idea/
 
 /dist
+# Coverage report written by `make cover`
+coverage.html
