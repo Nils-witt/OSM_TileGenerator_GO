@@ -5,6 +5,7 @@ package pipeline
 
 import (
 	"fmt"
+	"log/slog"
 
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/config"
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/generator"
@@ -26,19 +27,30 @@ type Options struct {
 	// MaxZoom is the zoom level the overlay is warped at; every level from
 	// MaxZoom-1 down to MinZoom is derived from it.
 	MaxZoom int
+	// Logger receives progress and diagnostic output; nil uses slog.Default().
+	Logger *slog.Logger
 }
 
 // Run generates the tile pyramid and tiles.zip for opts.Dir. A config with
-// fewer than four coordinate pairs is reported on stdout and skipped without
+// fewer than four coordinate pairs is logged as a warning and skipped without
 // error.
 func Run(opts Options) error {
-	fmt.Printf("Using config directory: %s\n", opts.Dir)
+	logger := opts.Logger
+	if logger == nil {
+		logger = slog.Default()
+	}
+	logger.Info("loading project", "dir", string(opts.Dir))
 
 	cfg, err := config.LoadConfig(string(opts.Dir))
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
-	fmt.Printf("Config loaded: %+v\n", cfg)
+	logger.Debug("loaded config",
+		"id", cfg.ID,
+		"name", cfg.Name,
+		"img_scale_width", cfg.ImgScale.Width,
+		"img_scale_height", cfg.ImgScale.Height,
+		"coordinates", len(cfg.Coordinates))
 
 	if err := opts.Dir.Create(); err != nil {
 		return fmt.Errorf("creating directories: %w", err)
@@ -49,9 +61,10 @@ func Run(opts Options) error {
 		return fmt.Errorf("reading image.png dimensions: %w", err)
 	}
 
-	fmt.Println(cfg.Coordinates)
 	if len(cfg.Coordinates) < markerCount {
-		fmt.Println("Not enough coordinates")
+		logger.Warn("not enough coordinates, skipping tile generation",
+			"have", len(cfg.Coordinates),
+			"need", markerCount)
 		return nil
 	}
 
@@ -64,21 +77,26 @@ func Run(opts Options) error {
 		opts.MaxZoom,
 		opts.Dir.TmpDir(),
 	)
+	gen.Logger = logger
 	if err := gen.Run(); err != nil {
 		return fmt.Errorf("generating tiles: %w", err)
 	}
 
 	for z := opts.MaxZoom - 1; z >= opts.MinZoom; z-- {
-		fmt.Printf("Resizing to %d\n", z)
+		logger.Info("building zoom level", "zoom", z)
 		if err := tilestore.Resize(opts.Dir.TilesDir(), z); err != nil {
 			return fmt.Errorf("resizing zoom %d: %w", z, err)
 		}
 	}
 
-	fmt.Printf("Creating zip archive: %s\n", opts.Dir.ZipPath())
+	logger.Info("creating zip archive", "path", opts.Dir.ZipPath())
 	if err := tilestore.Zip(opts.Dir.TilesDir(), opts.Dir.ZipPath()); err != nil {
 		return fmt.Errorf("zipping tiles: %w", err)
 	}
+
+	logger.Info("tile generation complete",
+		"tiles_dir", opts.Dir.TilesDir(),
+		"zip", opts.Dir.ZipPath())
 
 	return nil
 }

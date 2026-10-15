@@ -3,6 +3,7 @@ package main
 import (
 	"flag"
 	"io"
+	"log/slog"
 
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/server"
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/version"
@@ -14,10 +15,12 @@ const (
 	maxPort     = 65535
 )
 
-func runServe(args []string, stdout, stderr io.Writer) error {
+func runServe(args []string, stderr io.Writer) error {
 	fs := newFlagSet("serve", "Serve <config-dir>/tiles over HTTP with CORS enabled.", stderr)
 	configDir := fs.String("config-dir", "config", "Directory whose tiles/ subdirectory is served")
 	port := fs.Int("port", defaultPort, "TCP port to listen on")
+	var logs logFlags
+	logs.register(fs)
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
@@ -25,7 +28,7 @@ func runServe(args []string, stdout, stderr io.Writer) error {
 		return err
 	}
 
-	return serve(*configDir, *port, stdout)
+	return serve(*configDir, *port, logs.newLogger(stderr))
 }
 
 func validatePort(fs *flag.FlagSet, flagName string, port int) error {
@@ -35,7 +38,7 @@ func validatePort(fs *flag.FlagSet, flagName string, port int) error {
 	return nil
 }
 
-func serve(configDir string, port int, stdout io.Writer) error {
-	writef(stdout, "%s\n", version.String())
-	return server.ListenAndServe(workspace.Dir(configDir).TilesDir(), port)
+func serve(configDir string, port int, logger *slog.Logger) error {
+	logger.Info("starting", "command", "serve", "version", version.String())
+	return server.ListenAndServe(logger, workspace.Dir(configDir).TilesDir(), port)
 }

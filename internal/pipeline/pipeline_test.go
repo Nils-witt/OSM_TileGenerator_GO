@@ -2,8 +2,10 @@ package pipeline
 
 import (
 	"archive/zip"
+	"bytes"
 	"encoding/json"
 	"image"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
@@ -14,6 +16,9 @@ import (
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/imaging"
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/workspace"
 )
+
+// discardLogger keeps the pipeline's progress output out of test logs.
+var discardLogger = slog.New(slog.DiscardHandler)
 
 // testCoordinates places four markers on the corners of a 100x100 display
 // image covering roughly 700m x 1.1km in London. At zoom 16 that warps to
@@ -87,7 +92,7 @@ func TestRun(t *testing.T) {
 		}
 		dir := newProject(t, testCoordinates(), 200)
 
-		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16}); err != nil {
+		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16, Logger: discardLogger}); err != nil {
 			t.Fatalf("Run() error = %v", err)
 		}
 
@@ -113,9 +118,14 @@ func TestRun(t *testing.T) {
 	t.Run("skips generation when fewer than four coordinates", func(t *testing.T) {
 		t.Parallel()
 		dir := newProject(t, testCoordinates()[:3], 200)
+		var logs bytes.Buffer
+		logger := slog.New(slog.NewTextHandler(&logs, nil))
 
-		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16}); err != nil {
+		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16, Logger: logger}); err != nil {
 			t.Fatalf("Run() error = %v, want nil", err)
+		}
+		if want := "level=WARN msg=\"not enough coordinates, skipping tile generation\" have=3 need=4"; !strings.Contains(logs.String(), want) {
+			t.Errorf("logs = %q, want them to contain %q", logs.String(), want)
 		}
 		if _, err := os.Stat(dir.ZipPath()); !os.IsNotExist(err) {
 			t.Errorf("Stat(tiles.zip) error = %v, want not-exist", err)
@@ -126,7 +136,7 @@ func TestRun(t *testing.T) {
 		t.Parallel()
 		dir := workspace.Dir(t.TempDir())
 
-		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16}); err == nil {
+		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16, Logger: discardLogger}); err == nil {
 			t.Fatal("Run() error = nil, want error for missing config.json")
 		}
 	})

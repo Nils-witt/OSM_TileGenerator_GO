@@ -26,6 +26,7 @@ func TestRunServe(t *testing.T) {
 			name:       "missing tiles directory is a runtime error",
 			args:       []string{"serve", "-config-dir", missingDir},
 			wantAnyErr: true,
+			wantStderr: "level=INFO msg=starting command=serve",
 		},
 	})
 }

@@ -37,6 +37,7 @@ Run `osm-tile-generator <command> -h` to list a command's flags.
 | `-config-dir` | `config` | Directory containing config and image |
 | `-min-zoom`   | `14`     | Minimum zoom level to generate        |
 | `-max-zoom`   | `18`     | Maximum zoom level to generate        |
+| `-log-level`  | `info`   | `debug`, `info`, `warn` or `error`    |
 
 ### `serve` flags
 
@@ -44,9 +45,14 @@ Run `osm-tile-generator <command> -h` to list a command's flags.
 |---------------|----------|------------------------------------------|
 | `-config-dir` | `config` | Directory whose `tiles/` folder is served |
 | `-port`       | `8080`   | TCP port to listen on                    |
+| `-log-level`  | `info`   | `debug`, `info`, `warn` or `error`       |
 
 Running without a command (`osm-tile-generator -config-dir config`, or
 `-serve <port>`) still works but is deprecated and prints a warning.
+
+Progress is logged to stderr as structured `key=value` lines; stdout is only
+used for command output such as `version`. Use `-log-level debug` to see
+per-marker and per-tile details, or `-log-level warn` for quiet runs.
 
 Invalid flags exit with status 2; runtime failures exit with status 1.
 

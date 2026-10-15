@@ -16,6 +16,8 @@ type cliCase struct {
 	wantAnyErr bool  // any non-usage error, e.g. a missing input directory
 	wantStdout string
 	wantStderr string
+	// rejectStderr, when set, must not appear on stderr.
+	rejectStderr string
 }
 
 func runCLICases(t *testing.T, tests []cliCase) {
@@ -47,6 +49,9 @@ func runCLICases(t *testing.T, tests []cliCase) {
 			}
 			if !strings.Contains(stderr.String(), tt.wantStderr) {
 				t.Errorf("stderr = %q, want it to contain %q", stderr.String(), tt.wantStderr)
+			}
+			if tt.rejectStderr != "" && strings.Contains(stderr.String(), tt.rejectStderr) {
+				t.Errorf("stderr = %q, want it not to contain %q", stderr.String(), tt.rejectStderr)
 			}
 		})
 	}

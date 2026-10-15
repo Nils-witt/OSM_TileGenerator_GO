@@ -14,7 +14,7 @@ import (
 	"fmt"
 	_ "image/png"
 	"io"
-	"log"
+	"log/slog"
 	"os"
 	"strings"
 
@@ -50,21 +50,22 @@ func main() {
 	case errors.Is(err, errUsage):
 		os.Exit(2)
 	default:
-		log.Fatal(err)
+		writef(os.Stderr, "%s: %v\n", programName, err)
+		os.Exit(1)
 	}
 }
 
 // run dispatches args (without the program name) to a subcommand.
 func run(args []string, stdout, stderr io.Writer) error {
 	if len(args) == 0 || (strings.HasPrefix(args[0], "-") && !isHelpFlag(args[0])) {
-		return runLegacy(args, stdout, stderr)
+		return runLegacy(args, stderr)
 	}
 
 	switch cmd, rest := args[0], args[1:]; cmd {
 	case "generate":
-		return runGenerate(rest, stdout, stderr)
+		return runGenerate(rest, stderr)
 	case "serve":
-		return runServe(rest, stdout, stderr)
+		return runServe(rest, stderr)
 	case "version":
 		_, err := fmt.Fprintf(stdout, "%s\n%s\n", version.String(), repoURL)
 		return err
@@ -116,6 +117,21 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 		return usageErrorf(fs, "unexpected argument %q", fs.Arg(0))
 	}
 	return nil
+}
+
+// logFlags holds the logging flags every long-running command accepts.
+type logFlags struct {
+	level slog.Level
+}
+
+func (f *logFlags) register(fs *flag.FlagSet) {
+	fs.TextVar(&f.level, "log-level", slog.LevelInfo, "Minimum log level: debug, info, warn or error")
+}
+
+// newLogger returns a text logger writing to w at the configured level. Logs
+// always go to stderr so stdout stays free for program output.
+func (f *logFlags) newLogger(w io.Writer) *slog.Logger {
+	return slog.New(slog.NewTextHandler(w, &slog.HandlerOptions{Level: f.level}))
 }
 
 // usageErrorf reports a usage mistake together with fs's usage text.

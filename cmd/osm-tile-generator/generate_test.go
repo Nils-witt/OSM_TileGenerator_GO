@@ -35,9 +35,22 @@ func TestRunGenerate(t *testing.T) {
 			wantStderr: "-min-zoom must not be negative",
 		},
 		{
+			name:       "unknown log level is a usage error",
+			args:       []string{"generate", "-log-level", "loud"},
+			wantErr:    errUsage,
+			wantStderr: `invalid value "loud" for flag -log-level`,
+		},
+		{
 			name:       "missing config directory is a runtime error",
 			args:       []string{"generate", "-config-dir", missingDir},
 			wantAnyErr: true,
+			wantStderr: "level=INFO msg=starting command=generate",
+		},
+		{
+			name:         "error log level hides progress logs",
+			args:         []string{"generate", "-config-dir", missingDir, "-log-level", "error"},
+			wantAnyErr:   true,
+			rejectStderr: "level=INFO",
 		},
 	})
 }

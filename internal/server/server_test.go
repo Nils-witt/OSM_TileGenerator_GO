@@ -2,6 +2,7 @@ package server
 
 import (
 	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -89,7 +90,7 @@ func TestListenAndServe(t *testing.T) {
 	t.Run("fails when the tiles directory is missing", func(t *testing.T) {
 		t.Parallel()
 
-		if err := ListenAndServe(filepath.Join(t.TempDir(), "tiles"), 0); err == nil {
+		if err := ListenAndServe(slog.New(slog.DiscardHandler), filepath.Join(t.TempDir(), "tiles"), 0); err == nil {
 			t.Fatal("ListenAndServe() error = nil, want error for missing tiles directory")
 		}
 	})
@@ -101,7 +102,7 @@ func TestListenAndServe(t *testing.T) {
 			t.Fatalf("WriteFile() error = %v", err)
 		}
 
-		if err := ListenAndServe(path, 0); err == nil {
+		if err := ListenAndServe(slog.New(slog.DiscardHandler), path, 0); err == nil {
 			t.Fatal("ListenAndServe() error = nil, want error for non-directory tiles path")
 		}
 	})

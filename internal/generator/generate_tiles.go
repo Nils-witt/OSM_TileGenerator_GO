@@ -5,7 +5,7 @@ package generator
 import (
 	"fmt"
 	"image"
-	"log"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"sort"
@@ -41,6 +41,8 @@ type GenerateTiles struct {
 	Zoom           int
 	TmpDir         string
 	Markers        [4]Marker
+	// Logger receives progress and diagnostic output; nil uses slog.Default().
+	Logger *slog.Logger
 
 	coordinates   [4][2]float64 // lat, lng
 	picturePoints [4][2]float64 // x, y in source image pixel space
@@ -59,14 +61,25 @@ func NewGenerateTiles(tilesPath, overlayImgPath string, markers [4]Marker, zoom 
 	}
 }
 
+// logger returns g.Logger, falling back to slog.Default() so a zero-value
+// GenerateTiles still works.
+func (g *GenerateTiles) logger() *slog.Logger {
+	if g.Logger == nil {
+		return slog.Default()
+	}
+	return g.Logger
+}
+
 // createReferencePoints extracts parallel lat/lng and pixel-coordinate lists
 // from the 4 markers.
 func (g *GenerateTiles) createReferencePoints() {
 	for i, m := range g.Markers {
 		g.coordinates[i] = [2]float64{m.MapLat, m.MapLng}
 		g.picturePoints[i] = [2]float64{m.OverlayX, m.OverlayY}
-		log.Printf("[GenerateTiles] loaded coordinate %v", g.coordinates[i])
-		log.Printf("[GenerateTiles] loaded picture point %v", g.picturePoints[i])
+		g.logger().Debug("loaded marker",
+			"marker", i+1,
+			"coordinate", g.coordinates[i],
+			"picture_point", g.picturePoints[i])
 	}
 }
 
@@ -94,13 +107,19 @@ func (g *GenerateTiles) prepareCoordinatesForWarp() {
 	g.xMin = xTiles[0] - osmTileOffset
 	g.xMax = xTiles[3] + osmTileOffset
 
-	log.Printf("[GenerateTiles] X-Tile-Bounds[%d]: max: %d min: %d, count: %d", g.Zoom, g.xMax, g.xMin, g.xMax-g.xMin+1)
-	log.Printf("[GenerateTiles] Y-Tile-Bounds[%d]: max: %d min: %d, count: %d", g.Zoom, g.yMax, g.yMin, g.yMax-g.yMin+1)
+	g.logger().Debug("computed tile bounds",
+		"zoom", g.Zoom,
+		"x_min", g.xMin, "x_max", g.xMax, "x_count", g.xMax-g.xMin+1,
+		"y_min", g.yMin, "y_max", g.yMax, "y_count", g.yMax-g.yMin+1)
 
 	for i, val := range markerOsmTiles {
-		log.Printf("[GenerateTiles] [Marker %d][%d] Overlay [%v, %v] Map [%v, %v]",
-			i+1, g.Zoom, g.picturePoints[i][0], g.picturePoints[i][1],
-			(val[0]-float64(g.xMin))*imaging.TileSize, (val[1]-float64(g.yMin))*imaging.TileSize)
+		g.logger().Debug("marker position",
+			"marker", i+1,
+			"zoom", g.Zoom,
+			"overlay_x", g.picturePoints[i][0],
+			"overlay_y", g.picturePoints[i][1],
+			"map_x", (val[0]-float64(g.xMin))*imaging.TileSize,
+			"map_y", (val[1]-float64(g.yMin))*imaging.TileSize)
 	}
 
 	for i, val := range markerOsmTiles {
@@ -109,7 +128,7 @@ func (g *GenerateTiles) prepareCoordinatesForWarp() {
 			int((val[1] - float64(g.yMin)) * imaging.TileSize),
 		}
 	}
-	log.Printf("[GenerateTiles] Map Image Offsets: %v", g.mapImgOffsets)
+	g.logger().Debug("computed map image offsets", "offsets", g.mapImgOffsets)
 }
 
 // calculateTargetSize returns the pixel dimensions of the canvas the source
@@ -131,7 +150,7 @@ func (g *GenerateTiles) overlayCropPath() string {
 func (g *GenerateTiles) warpImage() error {
 	path := g.overlayPath()
 	if imaging.FileExists(path) {
-		log.Printf("[GenerateTiles] Skipping Warp, already exists")
+		g.logger().Info("skipping warp, output already exists", "path", path)
 		return nil
 	}
 
@@ -160,10 +179,9 @@ func (g *GenerateTiles) warpImage() error {
 // cropImage trims the warped canvas down to just its non-transparent region,
 // writing tmp/overlay_<zoom>_crop.png.
 func (g *GenerateTiles) cropImage() error {
-	log.Printf("[GenerateTiles] Cropping image")
 	cropPath := g.overlayCropPath()
 	if imaging.FileExists(cropPath) {
-		log.Printf("[GenerateTiles] Skipping crop, already exists")
+		g.logger().Info("skipping crop, output already exists", "path", cropPath)
 		return nil
 	}
 
@@ -174,14 +192,12 @@ func (g *GenerateTiles) cropImage() error {
 
 	lowerY := imaging.FindYBounds(img)
 	rightX := imaging.FindXBounds(img)
-	log.Printf("[GenerateTiles] YL: %d", lowerY)
-	log.Printf("[GenerateTiles] XR: %d", rightX)
+	g.logger().Debug("cropping warped image", "right_x", rightX, "lower_y", lowerY)
 
 	cropped := imaging.CropRegion(img, 0, 0, rightX, lowerY)
 	if err := imaging.SavePNG(cropPath, cropped); err != nil {
 		return fmt.Errorf("cropImage: saving cropped image: %w", err)
 	}
-	log.Printf("[GenerateTiles] Cropping image done")
 	return nil
 }
 
@@ -200,7 +216,7 @@ func (g *GenerateTiles) tileWorker(img *image.NRGBA, xOffset, yOffset int, saveP
 // tileXWorker processes all tiles in one column of the cropped image, saving
 // them under their global OSM tile coordinates.
 func (g *GenerateTiles) tileXWorker(img *image.NRGBA, xOffset int) error {
-	log.Printf("[GenerateTiles] Processing X Column %d", xOffset)
+	g.logger().Debug("slicing tile column", "x", xOffset+g.xMin)
 
 	currentXDir := tilestore.TileDirPath(g.TilesPath, g.Zoom, xOffset+g.xMin)
 	if err := os.MkdirAll(currentXDir, 0o755); err != nil {
@@ -234,7 +250,10 @@ func (g *GenerateTiles) generateTilesStep() error {
 	}
 
 	srcWidth := img.Bounds().Dx()
-	log.Printf("[GenerateTiles] Src Image[%d]: %d, %d", g.Zoom, srcWidth, img.Bounds().Dy())
+	g.logger().Debug("slicing cropped image",
+		"zoom", g.Zoom,
+		"width", srcWidth,
+		"height", img.Bounds().Dy())
 
 	xOffset := 0
 	for float64(xOffset) < float64(srcWidth)/float64(imaging.TileSize) {
@@ -243,14 +262,13 @@ func (g *GenerateTiles) generateTilesStep() error {
 		}
 		xOffset++
 	}
-	log.Printf("[GenerateTiles] Done alle")
 	return nil
 }
 
 // Run executes the complete tile generation pipeline: reference points,
 // warp, crop, and tile generation.
 func (g *GenerateTiles) Run() error {
-	log.Printf("[GenerateTiles] Starting")
+	g.logger().Info("generating tiles", "zoom", g.Zoom)
 	g.createReferencePoints()
 	g.prepareCoordinatesForWarp()
 	if err := g.warpImage(); err != nil {
@@ -262,6 +280,6 @@ func (g *GenerateTiles) Run() error {
 	if err := g.generateTilesStep(); err != nil {
 		return err
 	}
-	log.Printf("[GenerateTiles] Done")
+	g.logger().Info("generated tiles", "zoom", g.Zoom)
 	return nil
 }
