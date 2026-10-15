@@ -26,6 +26,7 @@ func solidNRGBA(w, h int, r, g, b, a uint8) *image.NRGBA {
 	for i := 0; i < len(img.Pix); i += 4 {
 		img.Pix[i], img.Pix[i+1], img.Pix[i+2], img.Pix[i+3] = r, g, b, a
 	}
+
 	return img
 }
 
@@ -39,9 +40,11 @@ func TestGenerateTiles_createReferencePoints(t *testing.T) {
 	for i, m := range markers {
 		wantCoord := [2]float64{m.MapLat, m.MapLng}
 		wantPoint := [2]float64{m.OverlayX, m.OverlayY}
+
 		if g.coordinates[i] != wantCoord {
 			t.Errorf("coordinates[%d] = %v, want %v", i, g.coordinates[i], wantCoord)
 		}
+
 		if g.picturePoints[i] != wantPoint {
 			t.Errorf("picturePoints[%d] = %v, want %v", i, g.picturePoints[i], wantPoint)
 		}
@@ -52,20 +55,24 @@ func TestGenerateTiles_prepareCoordinatesForWarp(t *testing.T) {
 	t.Parallel()
 
 	const zoom = 15
+
 	markers := testMarkers()
 	g := &GenerateTiles{Markers: markers, Zoom: zoom}
 	g.createReferencePoints()
 	g.prepareCoordinatesForWarp()
 
 	var osmTiles [4][2]float64
+
 	xTiles := make([]int, 4)
 	yTiles := make([]int, 4)
+
 	for i, m := range markers {
 		x, y := slippy.Deg2Num(m.MapLat, m.MapLng, zoom)
 		osmTiles[i] = [2]float64{x, y}
 		xTiles[i] = int(x)
 		yTiles[i] = int(y)
 	}
+
 	sort.Ints(xTiles)
 	sort.Ints(yTiles)
 
@@ -114,6 +121,7 @@ func TestGenerateTiles_overlayPaths(t *testing.T) {
 	if got, want := g.overlayPath(), filepath.FromSlash("/tmp/proj/overlay_15.png"); got != want {
 		t.Errorf("overlayPath() = %q, want %q", got, want)
 	}
+
 	if got, want := g.overlayCropPath(), filepath.FromSlash("/tmp/proj/overlay_15_crop.png"); got != want {
 		t.Errorf("overlayCropPath() = %q, want %q", got, want)
 	}
@@ -140,6 +148,7 @@ func TestGenerateTiles_warpImage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("reading overlay file: %v", err)
 		}
+
 		if string(got) != string(sentinel) {
 			t.Error("warpImage() overwrote an existing output file instead of skipping")
 		}
@@ -148,6 +157,7 @@ func TestGenerateTiles_warpImage(t *testing.T) {
 	t.Run("warps source image into the target canvas", func(t *testing.T) {
 		t.Parallel()
 		tmp := t.TempDir()
+
 		srcPath := filepath.Join(tmp, "overlay-src.png")
 		if err := imaging.SavePNG(srcPath, solidNRGBA(4, 4, 200, 50, 50, 255)); err != nil {
 			t.Fatalf("saving source image: %v", err)
@@ -167,9 +177,11 @@ func TestGenerateTiles_warpImage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loading warped output: %v", err)
 		}
+
 		if out.Bounds().Dx() != imaging.TileSize || out.Bounds().Dy() != imaging.TileSize {
 			t.Errorf("warped canvas size = %v, want %dx%d", out.Bounds(), imaging.TileSize, imaging.TileSize)
 		}
+
 		if imaging.Empty(out) {
 			t.Error("warped canvas is fully empty, want the source square painted into it")
 		}
@@ -197,6 +209,7 @@ func TestGenerateTiles_cropImage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("reading crop output file: %v", err)
 		}
+
 		if string(got) != string(sentinel) {
 			t.Error("cropImage() overwrote an existing output file instead of skipping")
 		}
@@ -208,12 +221,14 @@ func TestGenerateTiles_cropImage(t *testing.T) {
 		g := &GenerateTiles{TmpDir: tmp, Zoom: 3}
 
 		warped := image.NewNRGBA(image.Rect(0, 0, imaging.TileSize*2, imaging.TileSize*2))
+
 		for y := 50; y < 300; y++ {
 			for x := 50; x < 300; x++ {
 				off := warped.PixOffset(x, y)
 				warped.Pix[off], warped.Pix[off+1], warped.Pix[off+2], warped.Pix[off+3] = 10, 20, 30, 255
 			}
 		}
+
 		if err := imaging.SavePNG(g.overlayPath(), warped); err != nil {
 			t.Fatalf("saving warped fixture: %v", err)
 		}
@@ -229,6 +244,7 @@ func TestGenerateTiles_cropImage(t *testing.T) {
 		if err != nil {
 			t.Fatalf("loading cropped output: %v", err)
 		}
+
 		if cropped.Bounds().Dx() != wantW || cropped.Bounds().Dy() != wantH {
 			t.Errorf("cropped size = %v, want %dx%d", cropped.Bounds(), wantW, wantH)
 		}
@@ -248,6 +264,7 @@ func TestGenerateTiles_tileWorker(t *testing.T) {
 		if err := g.tileWorker(img, 0, 0, savePath); err != nil {
 			t.Fatalf("tileWorker() error = %v", err)
 		}
+
 		if !imaging.FileExists(savePath) {
 			t.Error("tileWorker() did not save a file for a non-empty tile")
 		}
@@ -263,6 +280,7 @@ func TestGenerateTiles_tileWorker(t *testing.T) {
 		if err := g.tileWorker(img, 0, 0, savePath); err != nil {
 			t.Fatalf("tileWorker() error = %v", err)
 		}
+
 		if imaging.FileExists(savePath) {
 			t.Error("tileWorker() saved a file for a fully transparent tile")
 		}
@@ -279,8 +297,8 @@ func TestGenerateTiles_tileXWorker(t *testing.T) {
 
 		// One column, two vertically-stacked tiles: row 0 has content, row 1 is empty.
 		img := image.NewNRGBA(image.Rect(0, 0, imaging.TileSize, imaging.TileSize*2))
-		for y := 0; y < imaging.TileSize; y++ {
-			for x := 0; x < imaging.TileSize; x++ {
+		for y := range imaging.TileSize {
+			for x := range imaging.TileSize {
 				off := img.PixOffset(x, y)
 				img.Pix[off], img.Pix[off+3] = 200, 255
 			}
@@ -294,6 +312,7 @@ func TestGenerateTiles_tileXWorker(t *testing.T) {
 		if !imaging.FileExists(nonEmptyPath) {
 			t.Errorf("expected tile at %s to exist", nonEmptyPath)
 		}
+
 		emptyPath := tilestore.TilePath(tilesPath, 7, 10, 21)
 		if imaging.FileExists(emptyPath) {
 			t.Errorf("expected no tile at %s (fully transparent)", emptyPath)
@@ -333,6 +352,7 @@ func TestGenerateTiles_generateTilesStep(t *testing.T) {
 			cropped.Pix[off+1], cropped.Pix[off+3] = 200, 255
 		}
 	}
+
 	if err := imaging.SavePNG(g.overlayCropPath(), cropped); err != nil {
 		t.Fatalf("saving cropped fixture: %v", err)
 	}

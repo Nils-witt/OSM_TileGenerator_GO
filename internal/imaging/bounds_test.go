@@ -10,6 +10,7 @@ func TestEmpty(t *testing.T) {
 
 	t.Run("all zero bytes", func(t *testing.T) {
 		t.Parallel()
+
 		img := image.NewNRGBA(image.Rect(0, 0, 3, 3))
 		if !Empty(img) {
 			t.Error("Empty() = false, want true for all-zero image")
@@ -18,7 +19,9 @@ func TestEmpty(t *testing.T) {
 
 	t.Run("single non-zero byte", func(t *testing.T) {
 		t.Parallel()
+
 		img := image.NewNRGBA(image.Rect(0, 0, 3, 3))
+
 		img.Pix[len(img.Pix)-1] = 1 // last byte, e.g. alpha of the last pixel
 		if Empty(img) {
 			t.Error("Empty() = true, want false when one byte is non-zero")
@@ -50,6 +53,7 @@ func TestRowAllZero(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			if got := rowAllZero(img, tt.y, tt.height); got != tt.want {
 				t.Errorf("rowAllZero(img, %d, %d) = %v, want %v", tt.y, tt.height, got, tt.want)
 			}
@@ -81,6 +85,7 @@ func TestColAllZero(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			if got := colAllZero(img, tt.x, tt.width); got != tt.want {
 				t.Errorf("colAllZero(img, %d, %d) = %v, want %v", tt.x, tt.width, got, tt.want)
 			}
@@ -110,6 +115,7 @@ func TestFindYBounds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			img := image.NewNRGBA(image.Rect(0, 0, 1, height))
 			if tt.contentRow >= 0 {
 				off := img.PixOffset(0, tt.contentRow)
@@ -141,6 +147,7 @@ func TestFindXBounds(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			img := image.NewNRGBA(image.Rect(0, 0, width, 1))
 			if tt.contentCol >= 0 {
 				off := img.PixOffset(tt.contentCol, 0)

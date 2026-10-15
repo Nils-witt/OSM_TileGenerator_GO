@@ -64,10 +64,9 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v9
         with:
-          version: latest
-          # Report only issues introduced by the change until the existing
-          # errcheck findings are fixed.
-          only-new-issues: true
+          # Pinned so a new golangci-lint release (and its new default checks)
+          # can't break CI unannounced; bump deliberately alongside .golangci.yml.
+          version: v2.14.0
 
   vulncheck:
     name: govulncheck

@@ -15,15 +15,17 @@ func WarpPerspective(src *image.NRGBA, h [3][3]float64, targetW, targetH int) *i
 	hInv := invert3x3(h)
 	dst := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
 
-	for dy := 0; dy < targetH; dy++ {
+	for dy := range targetH {
 		px := float64(dy)
-		for dx := 0; dx < targetW; dx++ {
+
+		for dx := range targetW {
 			x := float64(dx)
 
 			denom := hInv[2][0]*x + hInv[2][1]*px + hInv[2][2]
 			if denom == 0 {
 				continue
 			}
+
 			sx := (hInv[0][0]*x + hInv[0][1]*px + hInv[0][2]) / denom
 			sy := (hInv[1][0]*x + hInv[1][1]*px + hInv[1][2]) / denom
 
@@ -76,6 +78,7 @@ func bilinearSample(src *image.NRGBA, sx, sy float64) (r, g, b, a uint8, ok bool
 	lerp := func(v00, v10, v01, v11 float64) float64 {
 		top := v00*(1-fx) + v10*fx
 		bot := v01*(1-fx) + v11*fx
+
 		return top*(1-fy) + bot*fy
 	}
 

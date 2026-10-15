@@ -34,29 +34,36 @@ func Walk(dir string) ([]Coord, error) {
 	}
 
 	var tiles []Coord
+
 	for _, xDir := range xDirs {
 		if !xDir.IsDir() {
 			continue
 		}
+
 		xVal, err := strconv.Atoi(xDir.Name())
 		if err != nil {
 			continue
 		}
+
 		yEntries, err := os.ReadDir(filepath.Join(dir, xDir.Name()))
 		if err != nil {
 			return nil, err
 		}
+
 		for _, yEntry := range yEntries {
 			name := yEntry.Name()
 			if !strings.HasSuffix(name, ".png") {
 				continue
 			}
+
 			yVal, err := strconv.Atoi(strings.TrimSuffix(name, ".png"))
 			if err != nil {
 				continue
 			}
+
 			tiles = append(tiles, Coord{X: xVal, Y: yVal})
 		}
 	}
+
 	return tiles, nil
 }

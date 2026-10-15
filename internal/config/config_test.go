@@ -12,6 +12,7 @@ func TestLoadConfig(t *testing.T) {
 	t.Run("valid config", func(t *testing.T) {
 		t.Parallel()
 		dir := t.TempDir()
+
 		const data = `{
 			"id": "proj-1",
 			"name": "Test Project",
@@ -51,6 +52,7 @@ func TestLoadConfig(t *testing.T) {
 			got.MinZoom != want.MinZoom || got.MaxZoom != want.MaxZoom || got.ImgScale != want.ImgScale {
 			t.Errorf("LoadConfig() = %+v, want %+v", got, want)
 		}
+
 		if len(got.Coordinates) != len(want.Coordinates) || got.Coordinates[0] != want.Coordinates[0] {
 			t.Errorf("LoadConfig() Coordinates = %+v, want %+v", got.Coordinates, want.Coordinates)
 		}
@@ -68,6 +70,7 @@ func TestLoadConfig(t *testing.T) {
 
 	t.Run("invalid json", func(t *testing.T) {
 		t.Parallel()
+
 		dir := t.TempDir()
 		if err := os.WriteFile(filepath.Join(dir, "config.json"), []byte("{not json"), 0o644); err != nil {
 			t.Fatalf("writing fixture config: %v", err)

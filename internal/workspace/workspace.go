@@ -39,5 +39,6 @@ func (d Dir) Create() error {
 			return err
 		}
 	}
+
 	return nil
 }

@@ -4,16 +4,24 @@ import (
 	"archive/zip"
 	"fmt"
 	"io"
+	"io/fs"
 	"os"
-	"path/filepath"
 )
 
 // Zip archives every file under tilePath (the {z}/{x}/{y}.png tile pyramid)
 // into a single zip file at destPath, preserving the relative directory
-// structure. Close errors are reported because the zip central directory is
-// only written when the writer is closed; ignoring them would leave a
-// truncated archive behind.
+// structure. Files are read through an os.Root scoped to tilePath, so a
+// symlink pointing outside the pyramid fails the archive instead of leaking
+// that file into it. Close errors are reported because the zip central
+// directory is only written when the writer is closed; ignoring them would
+// leave a truncated archive behind.
 func Zip(tilePath, destPath string) (err error) {
+	root, err := os.OpenRoot(tilePath)
+	if err != nil {
+		return fmt.Errorf("Zip: opening %s: %w", tilePath, err)
+	}
+	defer func() { _ = root.Close() }() // read-only: a close error cannot lose data
+
 	zipFile, err := os.Create(destPath)
 	if err != nil {
 		return fmt.Errorf("Zip: creating %s: %w", destPath, err)
@@ -31,34 +39,36 @@ func Zip(tilePath, destPath string) (err error) {
 		}
 	}()
 
-	return filepath.Walk(tilePath, func(path string, info os.FileInfo, err error) error {
+	return fs.WalkDir(root.FS(), ".", func(name string, d fs.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
-		if info.IsDir() {
+
+		if d.IsDir() {
 			return nil
 		}
 
-		relPath, err := filepath.Rel(tilePath, path)
-		if err != nil {
-			return fmt.Errorf("Zip: relative path for %s: %w", path, err)
-		}
-
-		writer, err := zw.Create(filepath.ToSlash(relPath))
-		if err != nil {
-			return fmt.Errorf("Zip: creating zip entry %s: %w", relPath, err)
-		}
-
-		file, err := os.Open(path)
-		if err != nil {
-			return fmt.Errorf("Zip: opening %s: %w", path, err)
-		}
-		defer file.Close()
-
-		if _, err := io.Copy(writer, file); err != nil {
-			return fmt.Errorf("Zip: writing %s: %w", relPath, err)
-		}
-
-		return nil
+		return addZipEntry(zw, root, name)
 	})
+}
+
+// addZipEntry copies the file name (slash-separated, relative to root) into a
+// new zip entry of the same name.
+func addZipEntry(zw *zip.Writer, root *os.Root, name string) error {
+	file, err := root.Open(name)
+	if err != nil {
+		return fmt.Errorf("Zip: opening %s: %w", name, err)
+	}
+	defer func() { _ = file.Close() }() // read-only: a close error cannot lose data
+
+	writer, err := zw.Create(name)
+	if err != nil {
+		return fmt.Errorf("Zip: creating zip entry %s: %w", name, err)
+	}
+
+	if _, err := io.Copy(writer, file); err != nil {
+		return fmt.Errorf("Zip: writing %s: %w", name, err)
+	}
+
+	return nil
 }

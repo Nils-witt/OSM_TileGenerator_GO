@@ -12,6 +12,7 @@ func TestTilePath(t *testing.T) {
 	t.Parallel()
 
 	got := TilePath("/tiles", 14, 8192, 5461)
+
 	want := filepath.FromSlash("/tiles/14/8192/5461.png")
 	if got != want {
 		t.Errorf("TilePath() = %q, want %q", got, want)
@@ -22,6 +23,7 @@ func TestTileDirPath(t *testing.T) {
 	t.Parallel()
 
 	got := TileDirPath("/tiles", 14, 8192)
+
 	want := filepath.FromSlash("/tiles/14/8192")
 	if got != want {
 		t.Errorf("TileDirPath() = %q, want %q", got, want)
@@ -33,6 +35,7 @@ func sortCoords(c []Coord) {
 		if c[i].X != c[j].X {
 			return c[i].X < c[j].X
 		}
+
 		return c[i].Y < c[j].Y
 	})
 }
@@ -49,6 +52,7 @@ func TestWalk(t *testing.T) {
 			if err := os.MkdirAll(xDir, 0o755); err != nil {
 				t.Fatalf("mkdir %s: %v", xDir, err)
 			}
+
 			if err := os.WriteFile(filepath.Join(xDir, strconv.Itoa(y)+".png"), []byte("x"), 0o644); err != nil {
 				t.Fatalf("write tile %d/%d: %v", x, y, err)
 			}
@@ -63,12 +67,15 @@ func TestWalk(t *testing.T) {
 		if err := os.MkdirAll(filepath.Join(dir, "not-a-number"), 0o755); err != nil {
 			t.Fatalf("mkdir bogus x dir: %v", err)
 		}
+
 		if err := os.WriteFile(filepath.Join(dir, "stray.txt"), []byte("x"), 0o644); err != nil {
 			t.Fatalf("write stray file: %v", err)
 		}
+
 		if err := os.WriteFile(filepath.Join(dir, "1", "readme.txt"), []byte("x"), 0o644); err != nil {
 			t.Fatalf("write stray file in x dir: %v", err)
 		}
+
 		if err := os.WriteFile(filepath.Join(dir, "1", "notanumber.png"), []byte("x"), 0o644); err != nil {
 			t.Fatalf("write non-numeric tile: %v", err)
 		}
@@ -77,12 +84,14 @@ func TestWalk(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Walk() error = %v", err)
 		}
+
 		sortCoords(got)
 
 		want := []Coord{{X: 1, Y: 2}, {X: 1, Y: 3}, {X: 4, Y: 5}}
 		if len(got) != len(want) {
 			t.Fatalf("Walk() = %v, want %v", got, want)
 		}
+
 		for i := range want {
 			if got[i] != want[i] {
 				t.Errorf("Walk()[%d] = %v, want %v", i, got[i], want[i])
@@ -92,6 +101,7 @@ func TestWalk(t *testing.T) {
 
 	t.Run("missing directory returns error", func(t *testing.T) {
 		t.Parallel()
+
 		_, err := Walk(filepath.Join(t.TempDir(), "missing"))
 		if err == nil {
 			t.Fatal("Walk() error = nil, want error for missing directory")
@@ -100,10 +110,12 @@ func TestWalk(t *testing.T) {
 
 	t.Run("empty directory returns no tiles", func(t *testing.T) {
 		t.Parallel()
+
 		got, err := Walk(t.TempDir())
 		if err != nil {
 			t.Fatalf("Walk() error = %v", err)
 		}
+
 		if len(got) != 0 {
 			t.Errorf("Walk() = %v, want empty", got)
 		}

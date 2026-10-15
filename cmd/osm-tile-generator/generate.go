@@ -31,19 +31,24 @@ func (f *generateFlags) validate(fs *flag.FlagSet) error {
 	if f.minZoom < 0 {
 		return usageErrorf(fs, "-min-zoom must not be negative, got %d", f.minZoom)
 	}
+
 	if f.minZoom > f.maxZoom {
 		return usageErrorf(fs, "-min-zoom (%d) must not exceed -max-zoom (%d)", f.minZoom, f.maxZoom)
 	}
+
 	return nil
 }
 
 func runGenerate(args []string, stderr io.Writer) error {
 	fs := newFlagSet("generate", "Warp <config-dir>/image.png into a tile pyramid and zip it.", stderr)
+
 	var flags generateFlags
 	flags.register(fs)
+
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+
 	if err := flags.validate(fs); err != nil {
 		return err
 	}
@@ -53,6 +58,7 @@ func runGenerate(args []string, stderr io.Writer) error {
 
 func generate(flags generateFlags, logger *slog.Logger) error {
 	logger.Info("starting", "command", "generate", "version", version.String())
+
 	return pipeline.Run(pipeline.Options{
 		Dir:     workspace.Dir(flags.configDir),
 		MinZoom: flags.minZoom,

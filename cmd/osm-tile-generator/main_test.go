@@ -26,6 +26,7 @@ func runCLICases(t *testing.T, tests []cliCase) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			var stdout, stderr bytes.Buffer
 
 			err := run(tt.args, &stdout, &stderr)
@@ -44,12 +45,15 @@ func runCLICases(t *testing.T, tests []cliCase) {
 					t.Errorf("run(%q) error = %v, want %v", tt.args, err, tt.wantErr)
 				}
 			}
+
 			if !strings.Contains(stdout.String(), tt.wantStdout) {
 				t.Errorf("stdout = %q, want it to contain %q", stdout.String(), tt.wantStdout)
 			}
+
 			if !strings.Contains(stderr.String(), tt.wantStderr) {
 				t.Errorf("stderr = %q, want it to contain %q", stderr.String(), tt.wantStderr)
 			}
+
 			if tt.rejectStderr != "" && strings.Contains(stderr.String(), tt.rejectStderr) {
 				t.Errorf("stderr = %q, want it not to contain %q", stderr.String(), tt.rejectStderr)
 			}

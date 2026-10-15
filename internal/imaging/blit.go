@@ -13,23 +13,28 @@ func blit(dst, src *image.NRGBA, x0, y0 int) {
 	srcB := src.Bounds()
 	dstB := dst.Bounds()
 
-	for y := 0; y < srcB.Dy(); y++ {
+	for y := range srcB.Dy() {
 		dy := y0 + y
 		if dy < dstB.Min.Y || dy >= dstB.Max.Y {
 			continue
 		}
+
 		rowW := srcB.Dx()
+
 		dxStart := 0
 		if x0 < dstB.Min.X {
 			dxStart = dstB.Min.X - x0
 		}
+
 		dxEnd := rowW
 		if x0+rowW > dstB.Max.X {
 			dxEnd = dstB.Max.X - x0
 		}
+
 		if dxEnd <= dxStart {
 			continue
 		}
+
 		srcOff := src.PixOffset(srcB.Min.X+dxStart, srcB.Min.Y+y)
 		dstOff := dst.PixOffset(x0+dxStart, dy)
 		n := (dxEnd - dxStart) * 4
@@ -50,6 +55,7 @@ func Blit(dst, src *image.NRGBA, x0, y0 int) {
 func CropRegion(img *image.NRGBA, x0, y0, x1, y1 int) *image.NRGBA {
 	out := image.NewNRGBA(image.Rect(0, 0, x1-x0, y1-y0))
 	blit(out, img, -x0, -y0)
+
 	return out
 }
 
@@ -58,5 +64,6 @@ func CropRegion(img *image.NRGBA, x0, y0, x1, y1 int) *image.NRGBA {
 func Scale(img *image.NRGBA, w, h int) *image.NRGBA {
 	dst := image.NewNRGBA(image.Rect(0, 0, w, h))
 	xdraw.CatmullRom.Scale(dst, dst.Bounds(), img, img.Bounds(), xdraw.Src, nil)
+
 	return dst
 }

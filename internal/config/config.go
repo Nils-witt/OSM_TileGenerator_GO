@@ -1,3 +1,5 @@
+// Package config loads the project description (config.json) that the
+// georeferencing web UI writes: control points and the displayed image size.
 package config
 
 import (
@@ -51,9 +53,11 @@ func LoadConfig(configDir string) (*Project, error) {
 	if err != nil {
 		return nil, err
 	}
+
 	var p Project
 	if err := json.Unmarshal(data, &p); err != nil {
 		return nil, err
 	}
+
 	return &p, nil
 }

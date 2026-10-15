@@ -16,10 +16,14 @@ import (
 	"runtime/debug"
 )
 
+// Build metadata, set at link time via -ldflags "-X ...".
 var (
+	// Version is the release version, e.g. "v1.2.3"; "dev" for local builds.
 	Version = "dev"
-	Commit  = "none"
-	Date    = "unknown"
+	// Commit is the short git commit hash the binary was built from.
+	Commit = "none"
+	// Date is the build timestamp in RFC 3339 format.
+	Date = "unknown"
 )
 
 // String returns a single-line build summary, e.g.
@@ -29,9 +33,11 @@ func String() string {
 	if commit == "none" || date == "unknown" {
 		commit, date, modified = vcsFallback(commit, date)
 	}
+
 	if modified {
 		commit += "-dirty"
 	}
+
 	return fmt.Sprintf("osm-tile-generator %s (commit %s, built %s)", Version, commit, date)
 }
 
@@ -43,7 +49,9 @@ func vcsFallback(commit, date string) (string, string, bool) {
 	if !ok {
 		return commit, date, false
 	}
+
 	var modified bool
+
 	for _, s := range info.Settings {
 		switch s.Key {
 		case "vcs.revision":
@@ -61,5 +69,6 @@ func vcsFallback(commit, date string) (string, string, bool) {
 			modified = s.Value == "true"
 		}
 	}
+
 	return commit, date, modified
 }

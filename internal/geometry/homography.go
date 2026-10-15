@@ -13,10 +13,12 @@ import (
 // equivalent to cv2.findHomography's exact solution for 4 non-degenerate points
 // (no RANSAC/outlier rejection needed since the system is exactly determined).
 func SolveHomography(src, dst [4][2]float64) [3][3]float64 {
-	var a [8][8]float64
-	var b [8]float64
+	var (
+		a [8][8]float64
+		b [8]float64
+	)
 
-	for i := 0; i < 4; i++ {
+	for i := range 4 {
 		x, y := src[i][0], src[i][1]
 		u, v := dst[i][0], dst[i][1]
 
@@ -44,8 +46,9 @@ func SolveHomography(src, dst [4][2]float64) [3][3]float64 {
 func gaussianSolve8(a [8][8]float64, b [8]float64) [8]float64 {
 	const n = 8
 
-	for col := 0; col < n; col++ {
+	for col := range n {
 		pivot := col
+
 		maxVal := math.Abs(a[col][col])
 		for row := col + 1; row < n; row++ {
 			if v := math.Abs(a[row][col]); v > maxVal {
@@ -53,9 +56,11 @@ func gaussianSolve8(a [8][8]float64, b [8]float64) [8]float64 {
 				maxVal = v
 			}
 		}
+
 		if maxVal == 0 {
 			panic(fmt.Sprintf("homography: singular matrix at column %d", col))
 		}
+
 		if pivot != col {
 			a[col], a[pivot] = a[pivot], a[col]
 			b[col], b[pivot] = b[pivot], b[col]
@@ -66,21 +71,26 @@ func gaussianSolve8(a [8][8]float64, b [8]float64) [8]float64 {
 			if factor == 0 {
 				continue
 			}
+
 			for k := col; k < n; k++ {
 				a[row][k] -= factor * a[col][k]
 			}
+
 			b[row] -= factor * b[col]
 		}
 	}
 
 	var x [8]float64
+
 	for row := n - 1; row >= 0; row-- {
 		sum := b[row]
 		for k := row + 1; k < n; k++ {
 			sum -= a[row][k] * x[k]
 		}
+
 		x[row] = sum / a[row][row]
 	}
+
 	return x
 }
 
@@ -93,9 +103,11 @@ func invert3x3(m [3][3]float64) [3][3]float64 {
 	if det == 0 {
 		panic("homography: cannot invert singular matrix")
 	}
+
 	invDet := 1.0 / det
 
 	var inv [3][3]float64
+
 	inv[0][0] = (m[1][1]*m[2][2] - m[1][2]*m[2][1]) * invDet
 	inv[0][1] = (m[0][2]*m[2][1] - m[0][1]*m[2][2]) * invDet
 	inv[0][2] = (m[0][1]*m[1][2] - m[0][2]*m[1][1]) * invDet

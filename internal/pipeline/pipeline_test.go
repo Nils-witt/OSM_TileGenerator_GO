@@ -43,10 +43,12 @@ func newProject(t *testing.T, coords []config.CoordinatePair, imgSize int) works
 		ImgScale:    config.ImgScale{Width: 100, Height: 100},
 		Coordinates: coords,
 	}
+
 	data, err := json.Marshal(cfg)
 	if err != nil {
 		t.Fatalf("Marshal() error = %v", err)
 	}
+
 	if err := os.WriteFile(filepath.Join(string(dir), "config.json"), data, 0o644); err != nil {
 		t.Fatalf("WriteFile(config.json) error = %v", err)
 	}
@@ -55,9 +57,11 @@ func newProject(t *testing.T, coords []config.CoordinatePair, imgSize int) works
 	for i := range img.Pix {
 		img.Pix[i] = 0xff
 	}
+
 	if err := imaging.SavePNG(dir.ImagePath(), img); err != nil {
 		t.Fatalf("SavePNG() error = %v", err)
 	}
+
 	return dir
 }
 
@@ -65,18 +69,22 @@ func countPNGs(t *testing.T, root string) int {
 	t.Helper()
 
 	n := 0
+
 	err := filepath.WalkDir(root, func(path string, d os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
+
 		if !d.IsDir() && strings.HasSuffix(path, ".png") {
 			n++
 		}
+
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("walking %s: %v", root, err)
 	}
+
 	return n
 }
 
@@ -85,11 +93,13 @@ func TestRun(t *testing.T) {
 
 	t.Run("generates every zoom level and a zip archive", func(t *testing.T) {
 		t.Parallel()
+
 		if testing.Short() {
 			// The generator always warps into a canvas of at least 41x41 tiles
 			// (~440MB of RGBA), which takes about a minute under -race.
 			t.Skip("skipping full pipeline run in -short mode")
 		}
+
 		dir := newProject(t, testCoordinates(), 200)
 
 		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16, Logger: discardLogger}); err != nil {
@@ -97,11 +107,13 @@ func TestRun(t *testing.T) {
 		}
 
 		total := 0
+
 		for _, z := range []string{"14", "15", "16"} {
 			n := countPNGs(t, filepath.Join(dir.TilesDir(), z))
 			if n == 0 {
 				t.Errorf("zoom %s has no tiles", z)
 			}
+
 			total += n
 		}
 
@@ -110,6 +122,7 @@ func TestRun(t *testing.T) {
 			t.Fatalf("OpenReader() error = %v", err)
 		}
 		defer func() { _ = r.Close() }()
+
 		if len(r.File) != total {
 			t.Errorf("zip has %d entries, want %d (one per tile)", len(r.File), total)
 		}
@@ -118,15 +131,19 @@ func TestRun(t *testing.T) {
 	t.Run("skips generation when fewer than four coordinates", func(t *testing.T) {
 		t.Parallel()
 		dir := newProject(t, testCoordinates()[:3], 200)
+
 		var logs bytes.Buffer
+
 		logger := slog.New(slog.NewTextHandler(&logs, nil))
 
 		if err := Run(Options{Dir: dir, MinZoom: 14, MaxZoom: 16, Logger: logger}); err != nil {
 			t.Fatalf("Run() error = %v, want nil", err)
 		}
+
 		if want := "level=WARN msg=\"not enough coordinates, skipping tile generation\" have=3 need=4"; !strings.Contains(logs.String(), want) {
 			t.Errorf("logs = %q, want them to contain %q", logs.String(), want)
 		}
+
 		if _, err := os.Stat(dir.ZipPath()); !os.IsNotExist(err) {
 			t.Errorf("Stat(tiles.zip) error = %v, want not-exist", err)
 		}

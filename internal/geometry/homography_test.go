@@ -15,6 +15,7 @@ func applyHomography(h [3][3]float64, x, y float64) (float64, float64) {
 	denom := h[2][0]*x + h[2][1]*y + h[2][2]
 	u := (h[0][0]*x + h[0][1]*y + h[0][2]) / denom
 	v := (h[1][0]*x + h[1][1]*y + h[1][2]) / denom
+
 	return u, v
 }
 
@@ -23,6 +24,7 @@ func TestSolveHomography(t *testing.T) {
 
 	t.Run("identity mapping", func(t *testing.T) {
 		t.Parallel()
+
 		pts := [4][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
 		h := SolveHomography(pts, pts)
 
@@ -36,6 +38,7 @@ func TestSolveHomography(t *testing.T) {
 
 	t.Run("translation", func(t *testing.T) {
 		t.Parallel()
+
 		src := [4][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
 		dst := [4][2]float64{{5, 7}, {15, 7}, {15, 17}, {5, 17}}
 		h := SolveHomography(src, dst)
@@ -50,6 +53,7 @@ func TestSolveHomography(t *testing.T) {
 
 	t.Run("scale and translate", func(t *testing.T) {
 		t.Parallel()
+
 		src := [4][2]float64{{0, 0}, {100, 0}, {100, 50}, {0, 50}}
 		dst := [4][2]float64{{20, 20}, {220, 20}, {220, 120}, {20, 120}}
 		h := SolveHomography(src, dst)
@@ -64,6 +68,7 @@ func TestSolveHomography(t *testing.T) {
 
 	t.Run("general projective quadrilateral", func(t *testing.T) {
 		t.Parallel()
+
 		src := [4][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
 		// A non-parallelogram destination forces a genuinely projective (non-affine) solve.
 		dst := [4][2]float64{{0, 0}, {20, 5}, {15, 25}, {2, 18}}
@@ -79,8 +84,10 @@ func TestSolveHomography(t *testing.T) {
 
 	t.Run("h33 fixed to 1", func(t *testing.T) {
 		t.Parallel()
+
 		src := [4][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
 		dst := [4][2]float64{{5, 7}, {15, 7}, {15, 17}, {5, 17}}
+
 		h := SolveHomography(src, dst)
 		if h[2][2] != 1 {
 			t.Errorf("h[2][2] = %v, want 1", h[2][2])
@@ -89,6 +96,7 @@ func TestSolveHomography(t *testing.T) {
 
 	t.Run("collinear source points panics", func(t *testing.T) {
 		t.Parallel()
+
 		src := [4][2]float64{{0, 0}, {1, 0}, {2, 0}, {3, 0}} // all on one line: singular system
 		dst := [4][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
 
@@ -97,6 +105,7 @@ func TestSolveHomography(t *testing.T) {
 				t.Fatal("SolveHomography() with collinear source points did not panic")
 			}
 		}()
+
 		SolveHomography(src, dst)
 	})
 }
@@ -106,7 +115,9 @@ func TestInvert3x3(t *testing.T) {
 
 	t.Run("identity", func(t *testing.T) {
 		t.Parallel()
+
 		id := [3][3]float64{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}
+
 		got := invert3x3(id)
 		if got != id {
 			t.Errorf("invert3x3(identity) = %v, want %v", got, id)
@@ -115,6 +126,7 @@ func TestInvert3x3(t *testing.T) {
 
 	t.Run("known matrix", func(t *testing.T) {
 		t.Parallel()
+
 		m := [3][3]float64{
 			{2, 0, 0},
 			{0, 4, 0},
@@ -126,8 +138,9 @@ func TestInvert3x3(t *testing.T) {
 			{0, 0, 1},
 		}
 		got := invert3x3(m)
-		for r := 0; r < 3; r++ {
-			for c := 0; c < 3; c++ {
+
+		for r := range 3 {
+			for c := range 3 {
 				if !approxEqual(got[r][c], want[r][c], 1e-9) {
 					t.Errorf("invert3x3(%v)[%d][%d] = %v, want %v", m, r, c, got[r][c], want[r][c])
 				}
@@ -137,6 +150,7 @@ func TestInvert3x3(t *testing.T) {
 
 	t.Run("round trip through SolveHomography", func(t *testing.T) {
 		t.Parallel()
+
 		src := [4][2]float64{{0, 0}, {10, 0}, {10, 10}, {0, 10}}
 		dst := [4][2]float64{{5, 7}, {23, 4}, {18, 21}, {1, 15}}
 		h := SolveHomography(src, dst)
@@ -146,13 +160,16 @@ func TestInvert3x3(t *testing.T) {
 			// Mapping a dst point through h^-1 should land back near the
 			// corresponding src point (verified via forward+inverse round trip).
 			u, v := applyHomography(inv, p[0], p[1])
+
 			var matched bool
+
 			for _, s := range src {
 				if approxEqual(u, s[0], 1e-3) && approxEqual(v, s[1], 1e-3) {
 					matched = true
 					break
 				}
 			}
+
 			if !matched {
 				t.Errorf("invert3x3 round trip: (%v,%v) -> (%v,%v) matched no src point", p[0], p[1], u, v)
 			}
@@ -161,12 +178,15 @@ func TestInvert3x3(t *testing.T) {
 
 	t.Run("singular matrix panics", func(t *testing.T) {
 		t.Parallel()
+
 		m := [3][3]float64{{1, 2, 3}, {2, 4, 6}, {1, 1, 1}} // row 2 = 2 * row 1
+
 		defer func() {
 			if r := recover(); r == nil {
 				t.Fatal("invert3x3() with singular matrix did not panic")
 			}
 		}()
+
 		invert3x3(m)
 	})
 }

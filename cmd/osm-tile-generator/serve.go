@@ -19,11 +19,14 @@ func runServe(args []string, stderr io.Writer) error {
 	fs := newFlagSet("serve", "Serve <config-dir>/tiles over HTTP with CORS enabled.", stderr)
 	configDir := fs.String("config-dir", "config", "Directory whose tiles/ subdirectory is served")
 	port := fs.Int("port", defaultPort, "TCP port to listen on")
+
 	var logs logFlags
 	logs.register(fs)
+
 	if err := parseFlags(fs, args); err != nil {
 		return err
 	}
+
 	if err := validatePort(fs, "-port", *port); err != nil {
 		return err
 	}
@@ -35,6 +38,7 @@ func validatePort(fs *flag.FlagSet, flagName string, port int) error {
 	if port < 1 || port > maxPort {
 		return usageErrorf(fs, "%s must be between 1 and %d, got %d", flagName, maxPort, port)
 	}
+
 	return nil
 }
 

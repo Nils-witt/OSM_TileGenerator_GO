@@ -10,6 +10,7 @@ func TestDirPaths(t *testing.T) {
 	t.Parallel()
 
 	d := Dir(filepath.FromSlash("/proj"))
+
 	tests := []struct {
 		name string
 		got  string
@@ -44,6 +45,7 @@ func TestDirCreate(t *testing.T) {
 			if err != nil {
 				t.Fatalf("stat %s: %v", dir, err)
 			}
+
 			if !info.IsDir() {
 				t.Errorf("%s exists but is not a directory", dir)
 			}
@@ -57,6 +59,7 @@ func TestDirCreate(t *testing.T) {
 		if err := d.Create(); err != nil {
 			t.Fatalf("first Create() error = %v", err)
 		}
+
 		if err := d.Create(); err != nil {
 			t.Fatalf("second Create() error = %v", err)
 		}

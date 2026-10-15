@@ -25,10 +25,12 @@ func tileResponseHeaders(next http.Handler) http.Handler {
 		w.Header().Set("Access-Control-Allow-Origin", "*")
 		w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, OPTIONS")
 		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+
 		if r.Method == http.MethodOptions {
 			w.WriteHeader(http.StatusNoContent)
 			return
 		}
+
 		next.ServeHTTP(w, r)
 	})
 }
@@ -41,6 +43,7 @@ func ListenAndServe(logger *slog.Logger, tilesDir string, port int) error {
 	if err != nil {
 		return fmt.Errorf("tiles directory %q not found (generate tiles first): %w", tilesDir, err)
 	}
+
 	if !info.IsDir() {
 		return fmt.Errorf("tiles path %q is not a directory", tilesDir)
 	}
@@ -56,5 +59,6 @@ func ListenAndServe(logger *slog.Logger, tilesDir string, port int) error {
 	logger.Info("serving tiles",
 		"dir", tilesDir,
 		"url", "http://localhost"+srv.Addr)
+
 	return srv.ListenAndServe()
 }

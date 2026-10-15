@@ -43,6 +43,7 @@ func TestDeg2Num(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			gotX, gotY := Deg2Num(tt.latDeg, tt.lonDeg, tt.zoom)
 			if !approxEqual(gotX, tt.wantX, 1e-6) || !approxEqual(gotY, tt.wantY, 1e-6) {
 				t.Errorf("Deg2Num(%v, %v, %d) = (%v, %v), want (%v, %v)",
@@ -81,6 +82,7 @@ func TestNum2Deg(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			t.Parallel()
+
 			gotLat, gotLon := Num2Deg(tt.xTile, tt.yTile, tt.zoom)
 			if !approxEqual(gotLat, tt.wantLat, 1e-6) || !approxEqual(gotLon, tt.wantLon, 1e-6) {
 				t.Errorf("Num2Deg(%v, %v, %d) = (%v, %v), want (%v, %v)",
@@ -106,6 +108,7 @@ func TestDeg2NumNum2DegRoundTrip(t *testing.T) {
 	for _, p := range points {
 		for zoom := 0; zoom <= 18; zoom += 3 {
 			x, y := Deg2Num(p.lat, p.lon, zoom)
+
 			gotLat, gotLon := Num2Deg(x, y, zoom)
 			if !approxEqual(gotLat, p.lat, 1e-6) || !approxEqual(gotLon, p.lon, 1e-6) {
 				t.Errorf("round trip at zoom %d for (%v, %v): got (%v, %v)",

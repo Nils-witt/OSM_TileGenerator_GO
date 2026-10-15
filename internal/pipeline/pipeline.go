@@ -39,12 +39,14 @@ func Run(opts Options) error {
 	if logger == nil {
 		logger = slog.Default()
 	}
+
 	logger.Info("loading project", "dir", string(opts.Dir))
 
 	cfg, err := config.LoadConfig(string(opts.Dir))
 	if err != nil {
 		return fmt.Errorf("loading config: %w", err)
 	}
+
 	logger.Debug("loaded config",
 		"id", cfg.ID,
 		"name", cfg.Name,
@@ -65,6 +67,7 @@ func Run(opts Options) error {
 		logger.Warn("not enough coordinates, skipping tile generation",
 			"have", len(cfg.Coordinates),
 			"need", markerCount)
+
 		return nil
 	}
 
@@ -77,6 +80,7 @@ func Run(opts Options) error {
 		opts.MaxZoom,
 		opts.Dir.TmpDir(),
 	)
+
 	gen.Logger = logger
 	if err := gen.Run(); err != nil {
 		return fmt.Errorf("generating tiles: %w", err)
@@ -84,12 +88,14 @@ func Run(opts Options) error {
 
 	for z := opts.MaxZoom - 1; z >= opts.MinZoom; z-- {
 		logger.Info("building zoom level", "zoom", z)
+
 		if err := tilestore.Resize(opts.Dir.TilesDir(), z); err != nil {
 			return fmt.Errorf("resizing zoom %d: %w", z, err)
 		}
 	}
 
 	logger.Info("creating zip archive", "path", opts.Dir.ZipPath())
+
 	if err := tilestore.Zip(opts.Dir.TilesDir(), opts.Dir.ZipPath()); err != nil {
 		return fmt.Errorf("zipping tiles: %w", err)
 	}
@@ -122,5 +128,6 @@ func scaleMarkers(
 			MapLng:   c.Map.Longitude,
 		}
 	}
+
 	return markers
 }

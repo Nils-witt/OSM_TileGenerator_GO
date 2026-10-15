@@ -83,6 +83,7 @@ func isHelpFlag(arg string) bool {
 	case "-h", "-help", "--help":
 		return true
 	}
+
 	return false
 }
 
@@ -101,6 +102,7 @@ func newFlagSet(name, synopsis string, stderr io.Writer) *flag.FlagSet {
 		writef(stderr, "Usage:\n  %s [flags]\n\n%s\n\nFlags:\n", fs.Name(), synopsis)
 		fs.PrintDefaults()
 	}
+
 	return fs
 }
 
@@ -111,11 +113,14 @@ func parseFlags(fs *flag.FlagSet, args []string) error {
 		if errors.Is(err, flag.ErrHelp) {
 			return err
 		}
+
 		return errUsage
 	}
+
 	if fs.NArg() > 0 {
 		return usageErrorf(fs, "unexpected argument %q", fs.Arg(0))
 	}
+
 	return nil
 }
 
@@ -138,5 +143,6 @@ func (f *logFlags) newLogger(w io.Writer) *slog.Logger {
 func usageErrorf(fs *flag.FlagSet, format string, a ...any) error {
 	writef(fs.Output(), "%s: %s\n", fs.Name(), fmt.Sprintf(format, a...))
 	fs.Usage()
+
 	return errUsage
 }
