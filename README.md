@@ -9,17 +9,46 @@ image via homography and slices it into tiles across a range of zoom levels.
 
 The input can be created with [Georeferencer-WebUI](https://github.com/Nils-witt/Georeferencer-WebUI)
 
+Install the CLI, or download a binary from the GitHub releases:
+
 ```sh
-go run ./src --config-dir config --min-zoom 14 --max-zoom 18
+go install github.com/Nils-witt/OSM_TileGenerator_GO/cmd/osm-tile-generator@latest
 ```
 
-### Flags
+Generate tiles, then serve them locally:
+
+```sh
+osm-tile-generator generate -config-dir config -min-zoom 14 -max-zoom 18
+osm-tile-generator serve -config-dir config -port 8080
+```
+
+| Command    | Description                                                 |
+|------------|-------------------------------------------------------------|
+| `generate` | Warp `<config-dir>/image.png` into a tile pyramid and zip it |
+| `serve`    | Serve `<config-dir>/tiles` over HTTP with CORS enabled      |
+| `version`  | Print version information and the project URL               |
+
+Run `osm-tile-generator <command> -h` to list a command's flags.
+
+### `generate` flags
+
+| Flag          | Default  | Description                           |
+|---------------|----------|---------------------------------------|
+| `-config-dir` | `config` | Directory containing config and image |
+| `-min-zoom`   | `14`     | Minimum zoom level to generate        |
+| `-max-zoom`   | `18`     | Maximum zoom level to generate        |
+
+### `serve` flags
 
 | Flag          | Default  | Description                              |
-|---------------|----------|-------------------------------------------|
-| `-config-dir` | `config` | Directory containing config and image     |
-| `-min-zoom`   | `14`     | Minimum zoom level to generate            |
-| `-max-zoom`   | `18`     | Maximum zoom level to generate            |
+|---------------|----------|------------------------------------------|
+| `-config-dir` | `config` | Directory whose `tiles/` folder is served |
+| `-port`       | `8080`   | TCP port to listen on                    |
+
+Running without a command (`osm-tile-generator -config-dir config`, or
+`-serve <port>`) still works but is deprecated and prints a warning.
+
+Invalid flags exit with status 2; runtime failures exit with status 1.
 
 ### Input directory layout
 
@@ -49,7 +78,8 @@ pairs are required.
 
 Tiles are written to `<config-dir>/tiles/{z}/{x}/{y}.png`, generated at
 `-max-zoom` and downsampled for each lower zoom level down to `-min-zoom`.
-A `<config-dir>/tmp` directory is used for intermediate files.
+A `<config-dir>/tmp` directory is used for intermediate files, and the
+finished pyramid is also archived as `<config-dir>/tiles.zip`.
 
 ## Requirements
 
