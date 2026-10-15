@@ -3,10 +3,12 @@
 package imaging
 
 import (
+	"bufio"
 	"image"
 	"image/draw"
 	"image/png"
 	"os"
+	"sync"
 )
 
 // TileSize is the pixel size of one OSM slippy-map tile.
@@ -41,8 +43,31 @@ func toNRGBA(img image.Image) *image.NRGBA {
 	return out
 }
 
-// SavePNG encodes img as a PNG file at path. It reports errors from closing
-// the file too, since a failed close can leave a truncated PNG on disk.
+// pngEncoder reuses its zlib writer and scratch buffers across calls through
+// a pool, since a pyramid run encodes thousands of small tiles. png.Encoder is
+// safe for concurrent use as long as its BufferPool is.
+var pngEncoder = png.Encoder{BufferPool: &encoderBufferPool{}}
+
+// encoderBufferPool is a concurrency-safe png.EncoderBufferPool.
+type encoderBufferPool struct {
+	pool sync.Pool
+}
+
+// Get returns a pooled buffer, or nil to let the encoder allocate one.
+func (p *encoderBufferPool) Get() *png.EncoderBuffer {
+	b, _ := p.pool.Get().(*png.EncoderBuffer)
+
+	return b
+}
+
+func (p *encoderBufferPool) Put(b *png.EncoderBuffer) {
+	p.pool.Put(b)
+}
+
+// SavePNG encodes img as a PNG file at path. Writes are buffered because the
+// encoder emits each chunk's length, type and CRC as separate small writes.
+// It reports errors from flushing and closing the file too, since either can
+// leave a truncated PNG on disk.
 func SavePNG(path string, img image.Image) (err error) {
 	f, err := os.Create(path)
 	if err != nil {
@@ -54,7 +79,12 @@ func SavePNG(path string, img image.Image) (err error) {
 		}
 	}()
 
-	return png.Encode(f, img)
+	w := bufio.NewWriter(f)
+	if err := pngEncoder.Encode(w, img); err != nil {
+		return err
+	}
+
+	return w.Flush()
 }
 
 // FileExists reports whether a file exists at path.

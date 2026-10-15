@@ -49,7 +49,7 @@ clean:
 test:
 	$(GO) test -race -shuffle=on -coverprofile=coverage.out ./...
 
-## test-short: Run tests without the slow end-to-end pipeline run
+## test-short: Run tests in -short mode
 test-short:
 	$(GO) test -short -race ./...
 

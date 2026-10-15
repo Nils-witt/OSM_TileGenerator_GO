@@ -2,8 +2,10 @@ package tilestore
 
 import (
 	"image"
+	"maps"
 	"os"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"testing"
 
@@ -134,6 +136,46 @@ func TestResize(t *testing.T) {
 		}
 	})
 
+	t.Run("child lands in its own quadrant of the parent", func(t *testing.T) {
+		t.Parallel()
+		base := t.TempDir()
+
+		// Odd x, even y: the top-right quadrant of parent (10, 20).
+		const childZoom, childX, childY = 8, 21, 40
+
+		if err := os.MkdirAll(TileDirPath(base, childZoom, childX), 0o755); err != nil {
+			t.Fatalf("mkdir child dir: %v", err)
+		}
+
+		if err := imaging.SavePNG(TilePath(base, childZoom, childX, childY), solidTile(255, 0, 0, 255)); err != nil {
+			t.Fatalf("saving child tile: %v", err)
+		}
+
+		if err := Resize(base, childZoom-1); err != nil {
+			t.Fatalf("Resize() error = %v", err)
+		}
+
+		parentImg, err := imaging.LoadNRGBA(TilePath(base, childZoom-1, 10, 20))
+		if err != nil {
+			t.Fatalf("loading parent tile: %v", err)
+		}
+
+		half := imaging.TileSize / 2
+		for _, tc := range []struct {
+			name      string
+			x, y      int
+			wantAlpha uint8
+		}{
+			{name: "top-right", x: half + half/2, y: half / 2, wantAlpha: 255},
+			{name: "top-left", x: half / 2, y: half / 2, wantAlpha: 0},
+			{name: "bottom-right", x: half + half/2, y: half + half/2, wantAlpha: 0},
+		} {
+			if got := parentImg.NRGBAAt(tc.x, tc.y).A; got != tc.wantAlpha {
+				t.Errorf("%s quadrant alpha = %d, want %d", tc.name, got, tc.wantAlpha)
+			}
+		}
+	})
+
 	t.Run("missing source zoom directory returns error", func(t *testing.T) {
 		t.Parallel()
 
@@ -142,4 +184,18 @@ func TestResize(t *testing.T) {
 			t.Fatal("Resize() error = nil, want error when source zoom dir does not exist")
 		}
 	})
+}
+
+func TestGroupByParent(t *testing.T) {
+	t.Parallel()
+
+	got := groupByParent([]Coord{{X: 4, Y: 6}, {X: 5, Y: 7}, {X: 5, Y: 6}, {X: 7, Y: 0}})
+
+	want := map[Coord][]Coord{
+		{X: 2, Y: 3}: {{X: 4, Y: 6}, {X: 5, Y: 7}, {X: 5, Y: 6}},
+		{X: 3, Y: 0}: {{X: 7, Y: 0}},
+	}
+	if !maps.EqualFunc(got, want, slices.Equal) {
+		t.Errorf("groupByParent() = %v, want %v", got, want)
+	}
 }

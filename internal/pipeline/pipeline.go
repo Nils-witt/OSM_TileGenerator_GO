@@ -78,7 +78,6 @@ func Run(opts Options) error {
 		opts.Dir.ImagePath(),
 		markers,
 		opts.MaxZoom,
-		opts.Dir.TmpDir(),
 	)
 
 	gen.Logger = logger

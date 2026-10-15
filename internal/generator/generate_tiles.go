@@ -1,14 +1,21 @@
 // Package generator warps a source overlay image onto the OSM tile grid via
-// a 4-point homography and slices the result into 256x256 tile PNGs.
+// a 4-point homography, rendering it directly into 256x256 tile PNGs.
 package generator
 
 import (
+	"context"
 	"fmt"
 	"image"
 	"log/slog"
 	"os"
 	"path/filepath"
+	"runtime"
 	"sort"
+	"strconv"
+	"sync"
+	"sync/atomic"
+
+	"golang.org/x/sync/errgroup"
 
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/geometry"
 	"github.com/Nils-witt/OSM_TileGenerator_GO/internal/imaging"
@@ -33,13 +40,15 @@ type Marker struct {
 
 // GenerateTiles mirrors create_marker_overlay.py's GenerateTiles class: it
 // warps the source overlay image onto the OSM tile grid via a 4-point
-// homography, crops the warped canvas to its content, and slices it into
-// 256x256 tile PNGs.
+// homography and writes the non-empty 256x256 tiles as PNGs.
+//
+// Unlike the Python original it never materializes the whole warped canvas,
+// which spans at least 2*osmTileOffset tiles per side (>= 400 MB of NRGBA):
+// each tile is rendered straight from the source image, in parallel.
 type GenerateTiles struct {
 	TilesPath      string
 	OverlayImgPath string
 	Zoom           int
-	TmpDir         string
 	Markers        [4]Marker
 	// Logger receives progress and diagnostic output; nil uses slog.Default().
 	Logger *slog.Logger
@@ -52,14 +61,13 @@ type GenerateTiles struct {
 }
 
 // NewGenerateTiles returns a generator that warps the image at overlayImgPath
-// onto the tile grid at zoom and writes tiles beneath tilesPath, using tmpDir
-// for intermediate images. Set Logger on the result to capture progress.
-func NewGenerateTiles(tilesPath, overlayImgPath string, markers [4]Marker, zoom int, tmpDir string) *GenerateTiles {
+// onto the tile grid at zoom and writes tiles beneath tilesPath. Set Logger on
+// the result to capture progress.
+func NewGenerateTiles(tilesPath, overlayImgPath string, markers [4]Marker, zoom int) *GenerateTiles {
 	return &GenerateTiles{
 		TilesPath:      tilesPath,
 		OverlayImgPath: overlayImgPath,
 		Zoom:           zoom,
-		TmpDir:         tmpDir,
 		Markers:        markers,
 	}
 }
@@ -140,167 +148,152 @@ func (g *GenerateTiles) prepareCoordinatesForWarp() {
 }
 
 // calculateTargetSize returns the pixel dimensions of the canvas the source
-// image will be warped into.
+// image is warped into.
 func (g *GenerateTiles) calculateTargetSize() (int, int) {
 	return (g.xMax - g.xMin) * imaging.TileSize, (g.yMax - g.yMin) * imaging.TileSize
 }
 
-func (g *GenerateTiles) overlayPath() string {
-	return filepath.Join(g.TmpDir, fmt.Sprintf("overlay_%d.png", g.Zoom))
-}
-
-func (g *GenerateTiles) overlayCropPath() string {
-	return filepath.Join(g.TmpDir, fmt.Sprintf("overlay_%d_crop.png", g.Zoom))
-}
-
-// warpImage computes the homography from picturePoints -> mapImgOffsets and
-// warps the source image into the target canvas, writing tmp/overlay_<zoom>.png.
-func (g *GenerateTiles) warpImage() error {
-	path := g.overlayPath()
-	if imaging.FileExists(path) {
-		g.logger().Info("skipping warp, output already exists", "path", path)
-		return nil
-	}
-
+// homography returns the forward homography mapping source image pixels
+// (picturePoints) to warped canvas pixels (mapImgOffsets).
+func (g *GenerateTiles) homography() [3][3]float64 {
 	var srcPts, dstPts [4][2]float64
 	for i := range 4 {
 		srcPts[i] = g.picturePoints[i]
 		dstPts[i] = [2]float64{float64(g.mapImgOffsets[i][0]), float64(g.mapImgOffsets[i][1])}
 	}
 
-	h := geometry.SolveHomography(srcPts, dstPts)
+	return geometry.SolveHomography(srcPts, dstPts)
+}
 
-	srcImg, err := imaging.LoadNRGBA(g.OverlayImgPath)
-	if err != nil {
-		return fmt.Errorf("warpImage: loading overlay image: %w", err)
-	}
-
+// tileRange returns the half-open range of canvas tile offsets that can
+// contain warped content: the whole canvas, narrowed to the warp's footprint
+// when it has a finite one. Skipping the transparent margin outright is what
+// makes rendering cost proportional to the overlay, not to the padded canvas.
+func (g *GenerateTiles) tileRange(w *geometry.Warper) image.Rectangle {
 	targetW, targetH := g.calculateTargetSize()
-	outImg := geometry.WarpPerspective(srcImg, h, targetW, targetH)
 
-	if err := imaging.SavePNG(path, outImg); err != nil {
-		return fmt.Errorf("warpImage: saving warped image: %w", err)
+	area := image.Rect(0, 0, targetW, targetH)
+	if fp, ok := w.Footprint(); ok {
+		area = area.Intersect(fp)
 	}
 
-	return nil
+	if area.Empty() {
+		return image.Rectangle{}
+	}
+
+	// area.Min is never negative, so integer division floors.
+	return image.Rect(
+		area.Min.X/imaging.TileSize,
+		area.Min.Y/imaging.TileSize,
+		(area.Max.X+imaging.TileSize-1)/imaging.TileSize,
+		(area.Max.Y+imaging.TileSize-1)/imaging.TileSize,
+	)
 }
 
-// cropImage trims the warped canvas down to just its non-transparent region,
-// writing tmp/overlay_<zoom>_crop.png.
-func (g *GenerateTiles) cropImage() error {
-	cropPath := g.overlayCropPath()
-	if imaging.FileExists(cropPath) {
-		g.logger().Info("skipping crop, output already exists", "path", cropPath)
-		return nil
-	}
-
-	img, err := imaging.LoadNRGBA(g.overlayPath())
-	if err != nil {
-		return fmt.Errorf("cropImage: loading warped image: %w", err)
-	}
-
-	lowerY := imaging.FindYBounds(img)
-	rightX := imaging.FindXBounds(img)
-	g.logger().Debug("cropping warped image", "right_x", rightX, "lower_y", lowerY)
-
-	cropped := imaging.CropRegion(img, 0, 0, rightX, lowerY)
-	if err := imaging.SavePNG(cropPath, cropped); err != nil {
-		return fmt.Errorf("cropImage: saving cropped image: %w", err)
-	}
-
-	return nil
+// tilePool recycles tile render buffers: most rendered tiles near the
+// overlay's edges turn out empty and are discarded straight away.
+var tilePool = sync.Pool{
+	New: func() any { return newTile() },
 }
 
-// tileWorker crops one 256x256 tile from img and saves it, unless the tile is
-// fully transparent.
-func (g *GenerateTiles) tileWorker(img *image.NRGBA, xOffset, yOffset int, savePath string) error {
-	tile := imaging.CropRegion(img,
-		xOffset*imaging.TileSize, yOffset*imaging.TileSize,
-		xOffset*imaging.TileSize+imaging.TileSize, yOffset*imaging.TileSize+imaging.TileSize)
-	if imaging.Empty(tile) {
-		return nil
-	}
-
-	return imaging.SavePNG(savePath, tile)
+func newTile() *image.NRGBA {
+	return image.NewNRGBA(image.Rect(0, 0, imaging.TileSize, imaging.TileSize))
 }
 
-// tileXWorker processes all tiles in one column of the cropped image, saving
-// them under their global OSM tile coordinates.
-func (g *GenerateTiles) tileXWorker(img *image.NRGBA, xOffset int) error {
-	g.logger().Debug("slicing tile column", "x", xOffset+g.xMin)
-
-	currentXDir := tilestore.TileDirPath(g.TilesPath, g.Zoom, xOffset+g.xMin)
-	if err := os.MkdirAll(currentXDir, 0o755); err != nil {
-		return err
-	}
-
-	yOffset := 0
-	for float64(yOffset) < float64(img.Bounds().Dy())/float64(imaging.TileSize) {
-		savePath := tilestore.TilePath(g.TilesPath, g.Zoom, xOffset+g.xMin, yOffset+g.yMin)
-		if err := g.tileWorker(img, xOffset, yOffset, savePath); err != nil {
-			return err
-		}
-
-		yOffset++
-	}
-
-	entries, err := os.ReadDir(currentXDir)
-	if err != nil {
-		return err
-	}
-
-	if len(entries) == 0 {
-		return os.Remove(currentXDir)
-	}
-
-	return nil
-}
-
-// generateTilesStep tiles the entire cropped overlay image column by column.
-func (g *GenerateTiles) generateTilesStep() error {
-	img, err := imaging.LoadNRGBA(g.overlayCropPath())
-	if err != nil {
-		return fmt.Errorf("generateTilesStep: loading cropped image: %w", err)
-	}
-
-	srcWidth := img.Bounds().Dx()
-	g.logger().Debug("slicing cropped image",
+// renderTiles renders every tile in g.tileRange concurrently, saving the
+// non-empty ones under their global OSM tile coordinates. It returns how many
+// tiles were written. The first error stops further tiles from starting.
+func (g *GenerateTiles) renderTiles(w *geometry.Warper) (int, error) {
+	tiles := g.tileRange(w)
+	g.logger().Debug("rendering tiles",
 		"zoom", g.Zoom,
-		"width", srcWidth,
-		"height", img.Bounds().Dy())
+		"x_from", tiles.Min.X+g.xMin, "x_to", tiles.Max.X+g.xMin,
+		"y_from", tiles.Min.Y+g.yMin, "y_to", tiles.Max.Y+g.yMin)
 
-	xOffset := 0
-	for float64(xOffset) < float64(srcWidth)/float64(imaging.TileSize) {
-		if err := g.tileXWorker(img, xOffset); err != nil {
-			return err
+	eg, ctx := errgroup.WithContext(context.Background())
+	eg.SetLimit(runtime.GOMAXPROCS(0))
+
+	var written atomic.Int64
+
+schedule:
+	for ty := tiles.Min.Y; ty < tiles.Max.Y; ty++ {
+		for tx := tiles.Min.X; tx < tiles.Max.X; tx++ {
+			if ctx.Err() != nil {
+				break schedule
+			}
+
+			eg.Go(func() error {
+				ok, err := g.renderTile(w, tx, ty)
+				if ok {
+					written.Add(1)
+				}
+
+				return err
+			})
 		}
-
-		xOffset++
 	}
 
-	return nil
+	err := eg.Wait()
+
+	return int(written.Load()), err
 }
 
-// Run executes the complete tile generation pipeline: reference points,
-// warp, crop, and tile generation.
+// renderTile renders the canvas tile at offset (tx, ty) and saves it unless
+// it is fully transparent. It reports whether a tile was written.
+func (g *GenerateTiles) renderTile(w *geometry.Warper, tx, ty int) (bool, error) {
+	tile, ok := tilePool.Get().(*image.NRGBA)
+	if !ok {
+		tile = newTile()
+	}
+
+	defer func() {
+		// Render expects a transparent buffer.
+		clear(tile.Pix)
+		tilePool.Put(tile)
+	}()
+
+	if !w.Render(tile, tx*imaging.TileSize, ty*imaging.TileSize) {
+		return false, nil
+	}
+
+	x, y := tx+g.xMin, ty+g.yMin
+	if err := os.MkdirAll(tilestore.TileDirPath(g.TilesPath, g.Zoom, x), 0o755); err != nil {
+		return false, fmt.Errorf("renderTile: creating column %d: %w", x, err)
+	}
+
+	path := tilestore.TilePath(g.TilesPath, g.Zoom, x, y)
+	if err := imaging.SavePNG(path, tile); err != nil {
+		return false, fmt.Errorf("renderTile: saving tile %s: %w", path, err)
+	}
+
+	return true, nil
+}
+
+// Run executes the complete tile generation pipeline: reference points, tile
+// bounds, then warping the source image tile by tile.
 func (g *GenerateTiles) Run() error {
 	g.logger().Info("generating tiles", "zoom", g.Zoom)
 	g.createReferencePoints()
 	g.prepareCoordinatesForWarp()
 
-	if err := g.warpImage(); err != nil {
+	// Create the zoom directory even if no tile ends up non-empty, so the
+	// next lower zoom level finds (and walks) an empty level, not a missing one.
+	zoomDir := filepath.Join(g.TilesPath, strconv.Itoa(g.Zoom))
+	if err := os.MkdirAll(zoomDir, 0o755); err != nil {
+		return fmt.Errorf("Run: creating zoom directory: %w", err)
+	}
+
+	src, err := imaging.LoadNRGBA(g.OverlayImgPath)
+	if err != nil {
+		return fmt.Errorf("Run: loading overlay image: %w", err)
+	}
+
+	n, err := g.renderTiles(geometry.NewWarper(src, g.homography()))
+	if err != nil {
 		return err
 	}
 
-	if err := g.cropImage(); err != nil {
-		return err
-	}
-
-	if err := g.generateTilesStep(); err != nil {
-		return err
-	}
-
-	g.logger().Info("generated tiles", "zoom", g.Zoom)
+	g.logger().Info("generated tiles", "zoom", g.Zoom, "tiles", n)
 
 	return nil
 }

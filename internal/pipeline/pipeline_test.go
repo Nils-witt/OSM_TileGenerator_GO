@@ -22,8 +22,7 @@ var discardLogger = slog.New(slog.DiscardHandler)
 
 // testCoordinates places four markers on the corners of a 100x100 display
 // image covering roughly 700m x 1.1km in London. At zoom 16 that warps to
-// several tiles in each direction; an overlay narrower than one tile can fall
-// between the columns imaging.FindXBounds samples and produce no tiles.
+// several tiles in each direction.
 func testCoordinates() []config.CoordinatePair {
 	return []config.CoordinatePair{
 		{Img: config.ImgCoordinate{X: 0, Y: 0}, Map: config.MapCoordinate{Latitude: 51.510, Longitude: -0.130}},
@@ -93,12 +92,6 @@ func TestRun(t *testing.T) {
 
 	t.Run("generates every zoom level and a zip archive", func(t *testing.T) {
 		t.Parallel()
-
-		if testing.Short() {
-			// The generator always warps into a canvas of at least 41x41 tiles
-			// (~440MB of RGBA), which takes about a minute under -race.
-			t.Skip("skipping full pipeline run in -short mode")
-		}
 
 		dir := newProject(t, testCoordinates(), 200)
 

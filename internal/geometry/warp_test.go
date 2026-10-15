@@ -1,7 +1,9 @@
 package geometry
 
 import (
+	"bytes"
 	"image"
+	"math"
 	"testing"
 )
 
@@ -96,6 +98,170 @@ func TestWarpPerspective(t *testing.T) {
 	})
 }
 
+// referenceWarp is the original whole-canvas WarpPerspective loop, kept as an
+// oracle that the tiled Warper.Render must reproduce byte for byte.
+func referenceWarp(src *image.NRGBA, h [3][3]float64, targetW, targetH int) *image.NRGBA {
+	hInv := invert3x3(h)
+	dst := image.NewNRGBA(image.Rect(0, 0, targetW, targetH))
+
+	for dy := range targetH {
+		for dx := range targetW {
+			x, y := float64(dx), float64(dy)
+
+			denom := hInv[2][0]*x + hInv[2][1]*y + hInv[2][2]
+			if denom == 0 {
+				continue
+			}
+
+			sx := (hInv[0][0]*x + hInv[0][1]*y + hInv[0][2]) / denom
+			sy := (hInv[1][0]*x + hInv[1][1]*y + hInv[1][2]) / denom
+
+			r, g, b, a, ok := bilinearSample(src, sx, sy)
+			if !ok {
+				continue
+			}
+
+			off := dst.PixOffset(dx, dy)
+			dst.Pix[off], dst.Pix[off+1], dst.Pix[off+2], dst.Pix[off+3] = r, g, b, a
+		}
+	}
+
+	return dst
+}
+
+// gradientNRGBA returns a w x h image whose pixels all differ, with partial
+// alpha, so interpolation and rounding errors show up in comparisons.
+func gradientNRGBA(w, h int) *image.NRGBA {
+	return newTestNRGBA(w, h, func(x, y int) [4]uint8 {
+		return [4]uint8{uint8(x * 7), uint8(y * 11), uint8(x ^ y), uint8(128 + (x+y)%128)}
+	})
+}
+
+// testHomography maps a 64x48 source onto a skewed, perspective-distorted quad
+// inside a 300x250 canvas.
+func testHomography() [3][3]float64 {
+	return SolveHomography(
+		[4][2]float64{{0, 0}, {63, 0}, {63, 47}, {0, 47}},
+		[4][2]float64{{40.3, 30.7}, {250.1, 55.2}, {230.8, 210.4}, {20.5, 190.9}},
+	)
+}
+
+func TestWarper_Render(t *testing.T) {
+	t.Parallel()
+
+	const (
+		canvasW, canvasH = 300, 250
+		tile             = 64
+	)
+
+	src := gradientNRGBA(64, 48)
+	h := testHomography()
+	want := referenceWarp(src, h, canvasW, canvasH)
+	w := NewWarper(src, h)
+
+	t.Run("tiles reassemble into the reference canvas", func(t *testing.T) {
+		t.Parallel()
+
+		got := image.NewNRGBA(image.Rect(0, 0, canvasW, canvasH))
+
+		for ty := 0; ty < canvasH; ty += tile {
+			for tx := 0; tx < canvasW; tx += tile {
+				buf := image.NewNRGBA(image.Rect(0, 0, min(tile, canvasW-tx), min(tile, canvasH-ty)))
+				w.Render(buf, tx, ty)
+
+				for y := range buf.Bounds().Dy() {
+					copy(got.Pix[got.PixOffset(tx, ty+y):], buf.Pix[buf.PixOffset(0, y):buf.PixOffset(buf.Bounds().Dx(), y)])
+				}
+			}
+		}
+
+		if !bytes.Equal(got.Pix, want.Pix) {
+			t.Error("tiled Render output differs from the reference whole-canvas warp")
+		}
+	})
+
+	t.Run("reports whether the tile has content", func(t *testing.T) {
+		t.Parallel()
+
+		inside := image.NewNRGBA(image.Rect(0, 0, tile, tile))
+		if !w.Render(inside, 100, 100) {
+			t.Error("Render() over the warped quad = false, want true")
+		}
+
+		outside := image.NewNRGBA(image.Rect(0, 0, tile, tile))
+		if w.Render(outside, 0, canvasH) {
+			t.Error("Render() below the warped quad = true, want false")
+		}
+
+		if !bytes.Equal(outside.Pix, make([]uint8, len(outside.Pix))) {
+			t.Error("Render() wrote pixels into a tile outside the warped quad")
+		}
+	})
+}
+
+func TestWarper_Footprint(t *testing.T) {
+	t.Parallel()
+
+	t.Run("covers every pixel Render writes", func(t *testing.T) {
+		t.Parallel()
+
+		const canvasW, canvasH = 300, 250
+
+		h := testHomography()
+		canvas := referenceWarp(gradientNRGBA(64, 48), h, canvasW, canvasH)
+
+		fp, ok := NewWarper(gradientNRGBA(64, 48), h).Footprint()
+		if !ok {
+			t.Fatal("Footprint() ok = false, want true for a well-behaved homography")
+		}
+
+		if fp.Dx() > canvasW || fp.Dy() > canvasH {
+			t.Errorf("Footprint() = %v, want it tighter than the %dx%d canvas", fp, canvasW, canvasH)
+		}
+
+		for y := range canvasH {
+			for x := range canvasW {
+				off := canvas.PixOffset(x, y)
+				if canvas.Pix[off+3] != 0 && !image.Pt(x, y).In(fp) {
+					t.Fatalf("pixel (%d,%d) is written but outside Footprint() = %v", x, y, fp)
+				}
+			}
+		}
+	})
+
+	t.Run("source too small to sample is empty", func(t *testing.T) {
+		t.Parallel()
+
+		identity := [3][3]float64{{1, 0, 0}, {0, 1, 0}, {0, 0, 1}}
+
+		fp, ok := NewWarper(gradientNRGBA(1, 5), identity).Footprint()
+		if !ok || !fp.Empty() {
+			t.Errorf("Footprint() = %v, %v, want an empty rectangle, true", fp, ok)
+		}
+	})
+
+	t.Run("projection crossing the horizon is unbounded", func(t *testing.T) {
+		t.Parallel()
+
+		// The denominator x - 10 changes sign across the 20px-wide source.
+		h := [3][3]float64{{1, 0, 0}, {0, 1, 0}, {1, 0, -10}}
+
+		if _, ok := NewWarper(gradientNRGBA(20, 20), h).Footprint(); ok {
+			t.Error("Footprint() ok = true, want false when the denominator changes sign")
+		}
+	})
+
+	t.Run("huge projected corners are unbounded", func(t *testing.T) {
+		t.Parallel()
+
+		h := [3][3]float64{{math.MaxFloat32, 0, 0}, {0, 1, 0}, {0, 0, 1}}
+
+		if _, ok := NewWarper(gradientNRGBA(20, 20), h).Footprint(); ok {
+			t.Error("Footprint() ok = true, want false when corners overflow int range")
+		}
+	})
+}
+
 func TestBilinearSample(t *testing.T) {
 	t.Parallel()
 
@@ -153,4 +319,19 @@ func TestBilinearSample(t *testing.T) {
 			t.Error("bilinearSample(1,1) ok = true, want false")
 		}
 	})
+}
+
+func BenchmarkWarper_Render(b *testing.B) {
+	src := gradientNRGBA(2000, 1600)
+	h := SolveHomography(
+		[4][2]float64{{0, 0}, {1999, 0}, {1999, 1599}, {0, 1599}},
+		[4][2]float64{{10, 20}, {1000, 60}, {980, 900}, {0, 870}},
+	)
+	w := NewWarper(src, h)
+	tile := image.NewNRGBA(image.Rect(0, 0, 256, 256))
+
+	for b.Loop() {
+		clear(tile.Pix)
+		w.Render(tile, 256, 256)
+	}
 }

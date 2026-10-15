@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -17,6 +18,7 @@ func TestZip(t *testing.T) {
 		"14/8192/5461.png": "tile-a",
 		"14/8193/5461.png": "tile-b",
 		"13/4096/2730.png": "tile-c",
+		"README.txt":       "not a tile",
 	}
 	for rel, body := range want {
 		path := filepath.Join(tilesDir, filepath.FromSlash(rel))
@@ -43,6 +45,16 @@ func TestZip(t *testing.T) {
 	got := map[string]string{}
 
 	for _, f := range r.File {
+		// Already-compressed PNGs are stored; anything else is deflated.
+		wantMethod := zip.Deflate
+		if strings.HasSuffix(f.Name, ".png") {
+			wantMethod = zip.Store
+		}
+
+		if f.Method != wantMethod {
+			t.Errorf("entry %s method = %d, want %d", f.Name, f.Method, wantMethod)
+		}
+
 		rc, err := f.Open()
 		if err != nil {
 			t.Fatalf("open entry %s: %v", f.Name, err)

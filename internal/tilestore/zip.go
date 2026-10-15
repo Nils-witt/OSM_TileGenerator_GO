@@ -6,6 +6,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path"
 )
 
 // Zip archives every file under tilePath (the {z}/{x}/{y}.png tile pyramid)
@@ -53,7 +54,8 @@ func Zip(tilePath, destPath string) (err error) {
 }
 
 // addZipEntry copies the file name (slash-separated, relative to root) into a
-// new zip entry of the same name.
+// new zip entry of the same name. PNGs are already deflate-compressed, so they
+// are stored as-is: deflating them again costs CPU and saves next to nothing.
 func addZipEntry(zw *zip.Writer, root *os.Root, name string) error {
 	file, err := root.Open(name)
 	if err != nil {
@@ -61,7 +63,12 @@ func addZipEntry(zw *zip.Writer, root *os.Root, name string) error {
 	}
 	defer func() { _ = file.Close() }() // read-only: a close error cannot lose data
 
-	writer, err := zw.Create(name)
+	method := zip.Deflate
+	if path.Ext(name) == ".png" {
+		method = zip.Store
+	}
+
+	writer, err := zw.CreateHeader(&zip.FileHeader{Name: name, Method: method})
 	if err != nil {
 		return fmt.Errorf("Zip: creating zip entry %s: %w", name, err)
 	}

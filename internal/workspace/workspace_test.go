@@ -19,7 +19,6 @@ func TestDirPaths(t *testing.T) {
 		{"ConfigPath", d.ConfigPath(), "/proj/config.json"},
 		{"ImagePath", d.ImagePath(), "/proj/image.png"},
 		{"TilesDir", d.TilesDir(), "/proj/tiles"},
-		{"TmpDir", d.TmpDir(), "/proj/tmp"},
 		{"ZipPath", d.ZipPath(), "/proj/tiles.zip"},
 	}
 	for _, tt := range tests {
@@ -32,7 +31,7 @@ func TestDirPaths(t *testing.T) {
 func TestDirCreate(t *testing.T) {
 	t.Parallel()
 
-	t.Run("creates project, tiles, and tmp directories", func(t *testing.T) {
+	t.Run("creates project and tiles directories", func(t *testing.T) {
 		t.Parallel()
 		d := Dir(filepath.Join(t.TempDir(), "project"))
 
@@ -40,7 +39,7 @@ func TestDirCreate(t *testing.T) {
 			t.Fatalf("Create() error = %v", err)
 		}
 
-		for _, dir := range []string{string(d), d.TilesDir(), d.TmpDir()} {
+		for _, dir := range []string{string(d), d.TilesDir()} {
 			info, err := os.Stat(dir)
 			if err != nil {
 				t.Fatalf("stat %s: %v", dir, err)

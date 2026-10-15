@@ -48,17 +48,6 @@ func Blit(dst, src *image.NRGBA, x0, y0 int) {
 	blit(dst, src, x0, y0)
 }
 
-// CropRegion extracts the region [x0,y0)-[x1,y1) from img, top-left anchored at
-// (0,0) in the result. Mirrors PIL's Image.crop: parts of the requested region
-// that fall outside img's bounds are filled with zero bytes (fully transparent),
-// rather than erroring or clamping.
-func CropRegion(img *image.NRGBA, x0, y0, x1, y1 int) *image.NRGBA {
-	out := image.NewNRGBA(image.Rect(0, 0, x1-x0, y1-y0))
-	blit(out, img, -x0, -y0)
-
-	return out
-}
-
 // Scale resizes img to w x h using a Catmull-Rom (bicubic-family) filter,
 // standing in for PIL's default bicubic Image.resize().
 func Scale(img *image.NRGBA, w, h int) *image.NRGBA {
